@@ -53,9 +53,7 @@ const FILES = {
     ["workflows/release-please.yml", ".github/workflows/release-please.yml"],
     ["release-please-config.json", "release-please-config.json"],
   ],
-  piloto: [
-    ["workflows/esteira-piloto.yml", ".github/workflows/esteira-piloto.yml"],
-  ],
+  piloto: [],
 };
 const NEXT_CONFIGS = ["next.config.ts", "next.config.mjs", "next.config.js"];
 const RESET_ROUTE = ["api-e2e-reset/route.ts", "src/app/api/e2e/reset/route.ts"];
@@ -176,7 +174,15 @@ export function ensure(feature, opts = {}) {
     if (r.action === "warn") notes.push(r.note);
   };
   if (feature === "tests" || feature === "piloto") applyUpgrade(".github/workflows/ci.yml", upgradeCi);
-  if (feature === "piloto") applyUpgrade(".github/workflows/esteira-gates.yml", upgradeGates);
+  if (feature === "piloto") {
+    applyUpgrade(".github/workflows/esteira-gates.yml", upgradeGates);
+    applyUpgrade(".github/workflows/esteira-piloto.yml", (cur) => upgradeWorkflow(cur, {
+      latest: "esteira-piloto.yml",
+      legacy: ["esteira-piloto-v1.yml"],
+      keepIf: (c) => c.includes("allowed_bots"),
+      note: "O esteira-piloto.yml foi customizado: acrescente allowed_bots: github-actions em cada passo do claude-code-action (o disparo vem do esteira-gates, que é um bot).",
+    }));
+  }
 
   const gi = join(cwd, ".gitignore");
   const giBefore = existsSync(gi) ? readFileSync(gi, "utf8") : "";

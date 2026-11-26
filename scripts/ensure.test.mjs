@@ -157,3 +157,14 @@ test("F5: gates e CI customizados não são sobrescritos (só aviso)", () => {
   assert.equal(read(dir, ".github/workflows/esteira-gates.yml"), "name: esteira-gates\n# meu\n");
   assert.equal(r.notes.length, 2);
 });
+
+test("dry-run F5: piloto v1 (sem allowed_bots) é atualizado; o atual libera só o bot github-actions", () => {
+  const dir = app();
+  const v1 = readFileSync(new URL("../templates/app/workflows/legacy/esteira-piloto-v1.yml", import.meta.url), "utf8");
+  writeFileSync(join(dir, ".github/workflows/esteira-piloto.yml"), v1);
+  const r = ensure("piloto", { cwd: dir, "skip-install": true });
+  assert.equal(r.ok, true, r.error);
+  const wf = read(dir, ".github/workflows/esteira-piloto.yml");
+  assert.equal((wf.match(/allowed_bots: github-actions/g) || []).length, 3);
+  assert.doesNotMatch(wf, /allowed_bots: "\*"|allowed_bots: \*/);
+});
