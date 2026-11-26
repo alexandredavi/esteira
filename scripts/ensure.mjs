@@ -5,6 +5,7 @@
 // node ensure.mjs tests  → Vitest + Playwright, e2e/support.ts, rastreabilidade, CI v2
 // node ensure.mjs deploy → migração no build da Vercel (scripts/esteira/migrate.mjs) + docs/deploy.md
 // node ensure.mjs release → release-please (workflow, config e manifest com a versão do package.json)
+// node ensure.mjs piloto → piloto automático (workflow esteira-piloto + gates e CI que o disparam)
 //   [--cwd repo] [--skip-install]
 //
 // Nunca sobrescreve arquivo existente (exceto o ci.yml, e só se ainda for o template original da esteira).
@@ -27,6 +28,7 @@ export const PACKAGES = {
   tests: { deps: [], dev: ["vitest@5.1.2", "@playwright/test@1.65.1", "@types/node@^24"] },
   deploy: { deps: [], dev: [] },
   release: { deps: [], dev: [] },
+  piloto: { deps: [], dev: [] },
 };
 
 const FILES = {
@@ -51,6 +53,7 @@ const FILES = {
     ["workflows/release-please.yml", ".github/workflows/release-please.yml"],
     ["release-please-config.json", "release-please-config.json"],
   ],
+  piloto: [],
 };
 const NEXT_CONFIGS = ["next.config.ts", "next.config.mjs", "next.config.js"];
 const RESET_ROUTE = ["api-e2e-reset/route.ts", "src/app/api/e2e/reset/route.ts"];
@@ -60,9 +63,10 @@ const SCRIPTS = {
   tests: { test: "vitest run", "test:e2e": "playwright test", trace: "node scripts/esteira/traceability.mjs" },
   deploy: {},
   release: {},
+  piloto: {},
 };
 
-const GITIGNORE = { db: [".esteira/"], tests: ["test-results/", "playwright-report/", "blob-report/"], deploy: [], release: [] };
+const GITIGNORE = { db: [".esteira/"], tests: ["test-results/", "playwright-report/", "blob-report/"], deploy: [], release: [], piloto: [] };
 
 const MIGRATE = "node scripts/esteira/migrate.mjs";
 /** O build passa a migrar antes do next build (a migração só roda na Vercel com ESTEIRA_MIGRATE=1). */
@@ -85,19 +89,43 @@ export function patchNextConfig(src) {
 
 const normalize = (s) => s.replace(/\r\n/g, "\n").trim();
 
+/**
+ * Atualiza um workflow da esteira no produto: cria se não existe, troca se ainda é uma versão antiga
+ * SEM customização (igual a um template legado), mantém se já é o atual ou se tem o que precisa (keepIf),
+ * e só avisa se foi customizado — nunca sobrescreve trabalho da pessoa.
+ */
+export function upgradeWorkflow(current, { latest, legacy, keepIf, note }) {
+  const content = readFileSync(join(T, "workflows", latest), "utf8");
+  if (current == null) return { action: "create", content };
+  if (normalize(current) === normalize(content)) return { action: "keep" };
+  if (legacy.some((l) => normalize(current) === normalize(readFileSync(join(T, "workflows/legacy", l), "utf8")))) return { action: "upgrade", content };
+  if (keepIf(current)) return { action: "keep" };
+  return { action: "warn", note };
+}
+
 /** Decide o que fazer com o ci.yml do produto. */
 export function upgradeCi(current) {
-  const v2 = readFileSync(join(T, "workflows/ci.yml"), "utf8");
-  if (current == null) return { action: "create", content: v2 };
-  if (normalize(current) === normalize(v2)) return { action: "keep" };
-  if (normalize(current) === normalize(readFileSync(join(T, "workflows/legacy/ci-v1.yml"), "utf8"))) return { action: "upgrade", content: v2 };
-  if (current.includes("test:e2e") && current.includes("traceability")) return { action: "keep" };
-  return { action: "warn", note: "O ci.yml foi customizado: acrescente à mão os passos de teste, rastreabilidade e Playwright (veja o template da esteira em templates/app/workflows/ci.yml)." };
+  return upgradeWorkflow(current, {
+    latest: "ci.yml",
+    legacy: ["ci-v1.yml", "ci-v2.yml"],
+    keepIf: (c) => c.includes("test:e2e") && c.includes("traceability") && c.includes("workflow_dispatch"),
+    note: "O ci.yml foi customizado: acrescente à mão os passos de teste, rastreabilidade e Playwright e o gatilho workflow_dispatch (veja o template da esteira em templates/app/workflows/ci.yml).",
+  });
+}
+
+/** Decide o que fazer com o esteira-gates.yml do produto (a versão atual dispara o piloto). */
+export function upgradeGates(current) {
+  return upgradeWorkflow(current, {
+    latest: "esteira-gates.yml",
+    legacy: ["esteira-gates-v1.yml"],
+    keepIf: (c) => c.includes("esteira-piloto.yml"),
+    note: "O esteira-gates.yml foi customizado: acrescente o disparo do piloto (gh workflow run esteira-piloto.yml) e a permissão actions: write (veja templates/app/workflows/esteira-gates.yml).",
+  });
 }
 
 export function ensure(feature, opts = {}) {
   const cwd = resolve(opts.cwd ?? process.cwd());
-  if (!FILES[feature]) return { ok: false, error: `Camada desconhecida: ${feature}. Use db, tests, deploy ou release.` };
+  if (!FILES[feature]) return { ok: false, error: `Camada desconhecida: ${feature}. Use db, tests, deploy, release ou piloto.` };
   const pkgPath = join(cwd, "package.json");
   if (!existsSync(pkgPath)) return { ok: false, error: "Sem package.json: rode /esteira:setup antes." };
 
@@ -139,11 +167,21 @@ export function ensure(feature, opts = {}) {
 
   if (nextConfigPatch && nextConfigPatch.after !== nextConfigPatch.before) write(nextConfigPatch.name, nextConfigPatch.after);
 
-  if (feature === "tests") {
-    const ciPath = join(cwd, ".github/workflows/ci.yml");
-    const ci = upgradeCi(existsSync(ciPath) ? readFileSync(ciPath, "utf8") : null);
-    if (ci.action === "create" || ci.action === "upgrade") write(".github/workflows/ci.yml", ci.content);
-    if (ci.action === "warn") notes.push(ci.note);
+  const applyUpgrade = (rel, fn) => {
+    const abs = join(cwd, rel);
+    const r = fn(existsSync(abs) ? readFileSync(abs, "utf8") : null);
+    if (r.action === "create" || r.action === "upgrade") write(rel, r.content);
+    if (r.action === "warn") notes.push(r.note);
+  };
+  if (feature === "tests" || feature === "piloto") applyUpgrade(".github/workflows/ci.yml", upgradeCi);
+  if (feature === "piloto") {
+    applyUpgrade(".github/workflows/esteira-gates.yml", upgradeGates);
+    applyUpgrade(".github/workflows/esteira-piloto.yml", (cur) => upgradeWorkflow(cur, {
+      latest: "esteira-piloto.yml",
+      legacy: ["esteira-piloto-v1.yml", "esteira-piloto-v2.yml", "esteira-piloto-v3.yml"],
+      keepIf: (c) => c.includes("allowed_bots") && c.includes("ESTEIRA_PILOTO_TOKEN") && c.includes("steps.pre.outputs.skip"),
+      note: "O esteira-piloto.yml foi customizado: compare com o template da esteira (allowed_bots: github-actions, ESTEIRA_PILOTO_TOKEN só nos passos que precisam, pré-checagem da story e a espera pelo CI antes do review).",
+    }));
   }
 
   const gi = join(cwd, ".gitignore");

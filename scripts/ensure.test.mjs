@@ -134,3 +134,47 @@ test("dry-run F6: release-please sem prefixo de componente na tag (v0.2.0, não 
   const cfg = JSON.parse(readFileSync(new URL("../templates/app/release-please-config.json", import.meta.url), "utf8"));
   assert.equal(cfg.packages["."]["include-component-in-tag"], false);
 });
+
+test("F5: ensure piloto — workflow do piloto, gates v1 → v2 e CI v2 → v3 (com workflow_dispatch)", () => {
+  const dir = app();
+  const legacy = (f) => readFileSync(new URL(`../templates/app/workflows/legacy/${f}`, import.meta.url), "utf8");
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), legacy("ci-v2.yml"));
+  writeFileSync(join(dir, ".github/workflows/esteira-gates.yml"), legacy("esteira-gates-v1.yml"));
+  const r = ensure("piloto", { cwd: dir, "skip-install": true });
+  assert.equal(r.ok, true, r.error);
+  assert.match(read(dir, ".github/workflows/esteira-piloto.yml"), /anthropics\/claude-code-action@v1/);
+  assert.match(read(dir, ".github/workflows/esteira-gates.yml"), /gh workflow run esteira-piloto\.yml/);
+  assert.match(read(dir, ".github/workflows/ci.yml"), /workflow_dispatch:/);
+  assert.deepEqual(r.notes, []);
+});
+
+test("F5: gates e CI customizados não são sobrescritos (só aviso)", () => {
+  const dir = app();
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "name: ci\n# meu CI\n");
+  writeFileSync(join(dir, ".github/workflows/esteira-gates.yml"), "name: esteira-gates\n# meu\n");
+  const r = ensure("piloto", { cwd: dir, "skip-install": true });
+  assert.equal(read(dir, ".github/workflows/ci.yml"), "name: ci\n# meu CI\n");
+  assert.equal(read(dir, ".github/workflows/esteira-gates.yml"), "name: esteira-gates\n# meu\n");
+  assert.equal(r.notes.length, 2);
+});
+
+test("dry-run F5: piloto v1 e v2 são atualizados; o atual libera só o bot github-actions e usa o token do piloto", () => {
+  const dir = app();
+  const v1 = readFileSync(new URL("../templates/app/workflows/legacy/esteira-piloto-v1.yml", import.meta.url), "utf8");
+  writeFileSync(join(dir, ".github/workflows/esteira-piloto.yml"), v1);
+  const r = ensure("piloto", { cwd: dir, "skip-install": true });
+  assert.equal(r.ok, true, r.error);
+  const wf = read(dir, ".github/workflows/esteira-piloto.yml");
+  assert.equal((wf.match(/allowed_bots: github-actions/g) || []).length, 3);
+  assert.doesNotMatch(wf, /allowed_bots: "\*"|allowed_bots: \*/);
+  assert.match(wf, /ESTEIRA_PILOTO_TOKEN/);
+  assert.match(wf, /name: Esperar o CI do PR[\s\S]*name: Review/);
+  for (const v of ["esteira-piloto-v2.yml", "esteira-piloto-v3.yml"]) {
+    writeFileSync(join(dir, ".github/workflows/esteira-piloto.yml"), readFileSync(new URL("../templates/app/workflows/legacy/" + v, import.meta.url), "utf8"));
+    ensure("piloto", { cwd: dir, "skip-install": true });
+    const cur = read(dir, ".github/workflows/esteira-piloto.yml");
+    assert.match(cur, /steps.pre.outputs.skip/, v);
+    // o token nunca fica no env do job inteiro (npm ci, dependências)
+    assert.ok(!cur.split("steps:")[0].includes("secrets.ESTEIRA_PILOTO_TOKEN"), `${v}: token no env do job`);
+  }
+});
