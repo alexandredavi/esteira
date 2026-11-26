@@ -19,7 +19,7 @@ Rode `node ${CLAUDE_PLUGIN_ROOT}/scripts/deploy-status.mjs` e mostre:
 
 | Ambiente | Estado | URL | Commit |
 |---|---|---|---|
-| Produção | … | … | … |
+| Produção (último deploy) | … | … | … |
 | PR #n (preview) | … | … | — |
 
 Mais as `notes`. Pare aqui.
@@ -30,6 +30,8 @@ O rollback é no painel da Vercel e **é a pessoa que faz**: *Deployments* → o
 
 - As migrações da esteira são **só aditivas**, então o código anterior funciona com o banco novo. Não há rollback de banco.
 - A correção definitiva entra por um PR novo, que passa pela esteira.
+- **Depois de um Instant Rollback, a Vercel para de promover sozinha** os deploys novos da `main`. Quando a correção for mergeada, a pessoa precisa clicar em **Undo Rollback** (ou *Promote* no deploy novo). Senão a correção não vai para o ar.
+- O `production` do `deploy-status.mjs` é o **último** deploy de produção, não necessariamente o que está no ar depois de um rollback.
 
 Pare aqui.
 

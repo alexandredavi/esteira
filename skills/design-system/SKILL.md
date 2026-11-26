@@ -87,7 +87,7 @@ Os três precisam passar.
 ## 6. Abrir o gate
 
 ```
-node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs --stage design-system --branch design/system --title "feat(design): Design System do <Nome>" --paths <globals.css>,src/app/layout.tsx,src/app/design,docs/design --summary "<resumo sem aspas duplas, crases nem $: personalidade, primária, fonte, raio e contraste aprovado>"
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs --stage design-system --branch design/system --title "chore(design): Design System do <Nome>" --paths <globals.css>,src/app/layout.tsx,src/app/design,docs/design --summary "<resumo sem aspas duplas, crases nem $: personalidade, primária, fonte, raio e contraste aprovado>"
 ```
 
 `<globals.css>` é o caminho do `components.json` (ex.: `src/app/globals.css`). Leia o JSON: `opened: true` → link. `opened: false` → `reason`. `ok: false` → `error`.

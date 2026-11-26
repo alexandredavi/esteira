@@ -97,7 +97,7 @@ export function upgradeCi(current) {
 
 export function ensure(feature, opts = {}) {
   const cwd = resolve(opts.cwd ?? process.cwd());
-  if (!FILES[feature]) return { ok: false, error: `Camada desconhecida: ${feature}. Use db ou tests.` };
+  if (!FILES[feature]) return { ok: false, error: `Camada desconhecida: ${feature}. Use db, tests, deploy ou release.` };
   const pkgPath = join(cwd, "package.json");
   if (!existsSync(pkgPath)) return { ok: false, error: "Sem package.json: rode /esteira:setup antes." };
 

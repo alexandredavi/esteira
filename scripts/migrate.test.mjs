@@ -30,3 +30,12 @@ test("com os dois ligados migra; sem migrações em ./drizzle não", () => {
   assert.equal(shouldMigrate({ DATABASE_URL: "postgres://x", ESTEIRA_MIGRATE: "1", VERCEL_ENV: "production" }, repo()).run, true);
   assert.equal(shouldMigrate({ DATABASE_URL: "postgres://x", ESTEIRA_MIGRATE: "1" }, repo(false)).run, false);
 });
+
+test("revisão F4: a migração usa o driver com transação e um advisory lock", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../templates/app/esteira/migrate.mjs", import.meta.url), "utf8");
+  assert.match(src, /drizzle-orm\/neon-serverless\/migrator/);
+  assert.doesNotMatch(src, /neon-http\/migrator/);
+  assert.match(src, /pg_advisory_lock/);
+  assert.match(src, /pg_advisory_unlock/);
+});

@@ -20,10 +20,16 @@ beforeEach(() => {
 
 test("produção e previews dos PRs abertos, com o estado mais recente", () => {
   process.env.ESTEIRA_FAKE_GH_API = JSON.stringify({
-    "repos/{owner}/{repo}/deployments?per_page=50": [
-      { id: 3, sha: "ccccccc111", ref: "feat/10-timer", environment: "Preview – ponteiro", creator: vercel, created_at: "t3" },
+    // A lista geral recente só tem previews de outros PRs: produção e o PR antigo vêm das consultas filtradas.
+    "repos/{owner}/{repo}/deployments?per_page=10": [
+      { id: 9, sha: "9999999111", ref: "feat/99-outro", environment: "Preview – ponteiro", creator: vercel, created_at: "t9" },
+    ],
+    "repos/{owner}/{repo}/deployments?environment=Production&per_page=5": [
       { id: 2, sha: "bbbbbbb111", ref: "main", environment: "Production", creator: vercel, created_at: "t2" },
       { id: 1, sha: "aaaaaaa111", ref: "main", environment: "Production", creator: vercel, created_at: "t1" },
+    ],
+    "repos/{owner}/{repo}/deployments?ref=feat%2F10-timer&per_page=5": [
+      { id: 3, sha: "ccccccc111", ref: "feat/10-timer", environment: "Preview – ponteiro", creator: vercel, created_at: "t3" },
     ],
     "repos/{owner}/{repo}/deployments/2/statuses?per_page=1": [{ state: "success", environment_url: "https://ponteiro.vercel.app" }],
     "repos/{owner}/{repo}/deployments/3/statuses?per_page=1": [{ state: "success", environment_url: "https://ponteiro-git-feat-10.vercel.app" }],
@@ -42,7 +48,7 @@ test("produção e previews dos PRs abertos, com o estado mais recente", () => {
 });
 
 test("repo sem Vercel e build sem migração viram avisos", () => {
-  process.env.ESTEIRA_FAKE_GH_API = JSON.stringify({ "repos/{owner}/{repo}/deployments?per_page=50": [] });
+  process.env.ESTEIRA_FAKE_GH_API = JSON.stringify({ "repos/{owner}/{repo}/deployments?per_page=10": [] });
   const r = deployStatus({ cwd: repo("next build") });
   assert.equal(r.vercel, "não conectada");
   assert.equal(r.production, null);

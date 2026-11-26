@@ -18,7 +18,7 @@ Revise **o que está commitado no branch** (o diff). Se o working tree tiver mud
 
 1. **Spec × código**: cada `AC-<n>.<k>` da seção Produto é de fato cumprido pela implementação? Leia o Gherkin e siga o código. Um AC com teste verde e implementação errada (o teste verifica a menos) é defeito grave.
 2. **Regras da Técnica**: modelo de dados, regras de negócio e mensagens. As divergências estão em "Notas de implementação"?
-3. **Dados**: as migrações em `drizzle/` são **só aditivas** (sem drop nem rename)? Há `db.transaction()` (proibido: o Neon via HTTP não tem)? Há consulta sem filtro que deveria ter? Dinheiro em centavos, datas em UTC?
+3. **Dados**: as migrações em `drizzle/` são **só aditivas** (sem drop nem rename) e toda coluna nova em tabela existente é nullable ou tem DEFAULT? Há `db.transaction()` (proibido: o Neon via HTTP não tem)? Há consulta sem filtro que deveria ter? Dinheiro em centavos, datas em UTC?
 4. **Segurança**: server actions validam a entrada (tipos, tamanhos, IDs que existem)? Algum dado vaza entre contextos? A rota `/api/e2e/reset` continua protegida?
 5. **Testes de aceite**: cada teste verifica o que o "Então" diz, sem verificar a menos? O "Dado" é montado de verdade? Há `waitForTimeout`, `test.skip` ou asserção que sempre passa?
 6. **Design System**: componentes de `src/components/ui` e tokens semânticos; componente novo sem justificativa; textos fora do tom do DS.

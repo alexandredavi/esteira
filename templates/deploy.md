@@ -23,10 +23,11 @@
 ## Rollback
 
 - **Código:** no painel da Vercel, *Deployments* → o deploy anterior → *Instant Rollback*. É imediato e não refaz o build.
-- **Banco:** as migrações da esteira são **só aditivas** (tabelas e colunas novas). Por isso o código anterior continua funcionando com o banco novo, e o rollback de código não exige rollback de banco.
+- **Atenção:** depois de um Instant Rollback, a Vercel **para de promover sozinha** os deploys novos da `main` para produção. Quando o PR com a correção for mergeado, use **Undo Rollback** (ou *Promote* no deploy novo) para produção voltar a acompanhar a `main`.
+- **Banco:** as migrações da esteira são **só aditivas** (tabelas e colunas novas; coluna nova é nullable ou tem DEFAULT). Por isso o código anterior continua funcionando com o banco novo, e o rollback de código não exige rollback de banco.
 - Se uma migração estiver errada: corrija com **uma nova migração** num PR (nunca edite a que já rodou).
 
 ## Diagnóstico
 
-- `/esteira:deploy` (sem argumentos) mostra o último deploy de produção e o preview de cada PR aberto.
+- `/esteira:deploy status` mostra o **último** deploy de produção (depois de um rollback, pode não ser o que está no ar) e o preview de cada PR aberto.
 - Build falhou com `[esteira] migração falhou`: o deploy não sobe, e a versão anterior continua no ar. Leia o erro no log da Vercel.

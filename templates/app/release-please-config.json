@@ -8,7 +8,7 @@
         { "type": "feat", "section": "Novidades" },
         { "type": "fix", "section": "Correções" },
         { "type": "perf", "section": "Desempenho" },
-        { "type": "docs", "section": "Documentação" },
+        { "type": "docs", "section": "Documentação", "hidden": true },
         { "type": "chore", "section": "Manutenção", "hidden": true },
         { "type": "ci", "section": "CI", "hidden": true },
         { "type": "test", "section": "Testes", "hidden": true }

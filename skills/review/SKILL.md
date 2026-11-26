@@ -42,7 +42,7 @@ Delegue ao subagente **`esteira:reviewer`** (ferramenta Agent). Passe **só** o 
 
 ## 3. Publicar
 
-Escreva `.esteira/review-<PR ou branch>.md` com a ferramenta Write:
+Escreva `.esteira/review-<PR ou branch>.md` com a ferramenta Write (no nome do branch, troque `/` por `-`):
 
 ```
 ## Review da esteira — #<n> <título da story>
