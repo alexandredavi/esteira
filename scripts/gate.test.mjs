@@ -182,3 +182,18 @@ test("dry-run F6: caminho ignorado pelo .gitignore fica de fora em vez de quebra
   assert.equal(r.ok, true, r.error);
   assert.deepEqual(r.paths, [path]);
 });
+
+test("revisão F6: reabrir um gate com caminho ignorado não deixa stash nem index sujo", () => {
+  const { dir } = productRepo({ remote: false });
+  writeFileSync(join(dir, ".gitignore"), "next-env.d.ts\n");
+  writeFileSync(join(dir, "next-env.d.ts"), "// gerado\n");
+  const path = writeArtifact(dir);
+  openGate({ cwd: dir, stage: "setup", branch: "chore/setup", title: "v1", paths: path });
+  sh(dir, "switch", "-q", "main");
+  mkdirSync(join(dir, "docs/product"), { recursive: true });
+  writeFileSync(join(dir, path), "# v2\n");
+  const r = openGate({ cwd: dir, stage: "setup", branch: "chore/setup", title: "v2", paths: `${path},next-env.d.ts` });
+  assert.equal(r.ok, true, r.error);
+  assert.equal(sh(dir, "stash", "list"), "");
+  assert.equal(sh(dir, "log", "-1", "--format=%s"), "v2");
+});

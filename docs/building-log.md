@@ -265,3 +265,14 @@ Conferi as telas no navegador: o timer conta de verdade, e a vitrine mostra os d
 - Usei `git commit -am` no dry-run e levei junto uma linha que o `vercel link` tinha posto no `.gitignore`.
 
 **Configuração feita por mim, com o OK do Alexandre:** repo público, só squash merge com o título do PR, permissões do Actions, `ESTEIRA_MIGRATE=1` (Production e Preview, porque o Neon cria um branch por preview) e o redeploy. Primeiro foi preciso descobrir que o redeploy inicial tinha **pulado** a migração: a trava funcionou como projetado.
+
+**Revisão independente das correções da F6:** achou 6 problemas, todos corrigidos com teste:
+
+| # | Problema | Correção |
+|---|---|---|
+| 1 | A minha correção 6 (falhar sem `DATABASE_URL` na Vercel) **quebraria os previews dos PRs de dev**, que vêm antes de o Neon ser conectado, e o dev local depois de um `vercel env pull` (`VERCEL_ENV=development`) | Falha só em **produção** |
+| 2 | O preview era buscado pelo nome do branch, e um PR de fork com branch `main` mostraria a produção | Busca pelo SHA do head |
+| 3 | O status "Vercel Preview Comments", sempre verde, podia mascarar um deploy que falhou | Contexto exato "Vercel" |
+| 4 | O filtro de caminhos ignorados rodava depois do stash, ao reabrir o gate, e deixava stash e index sujos | O filtro roda antes de qualquer mudança no repo, sem aspas em caminho com acento |
+| 5 | Ao retomar um setup que falhou, o pacote continuava `app` | Renomeia sempre que o nome é `app` |
+| 6 | Repos com releases `app-vX` perderiam a referência se o formato da tag mudasse | O `ensure` não sobrescreve a config, e a skill explica |

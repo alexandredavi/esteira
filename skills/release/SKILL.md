@@ -44,6 +44,8 @@ Para cada check com `ok: false`, mostre o `comoCorrigir`. Mudar configuração d
 
 Depois do merge desse PR, o próximo push na `main` faz o release-please abrir o Release PR.
 
+A tag é `vX.Y.Z` (`include-component-in-tag: false`). Um repo que já tenha releases com tag `app-vX.Y.Z` (config antiga) mantém a config dele: o `ensure` não sobrescreve. Trocar o formato no meio do histórico faria o release-please não achar a release anterior.
+
 ## 2. Mostrar a próxima versão
 
 ```

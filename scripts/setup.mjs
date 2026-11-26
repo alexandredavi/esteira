@@ -152,7 +152,7 @@ export function setup(opts = {}) {
   // 3. Script de typecheck (idempotente).
   const pkgJson = addScripts(JSON.parse(readFileSync(pkgPath, "utf8")));
   // O create-next-app gerou numa pasta temporária "app": o pacote leva o nome do repo (vai para a release).
-  if (!existing && pkgJson.name === "app") pkgJson.name = packageName(basename(cwd));
+  if (pkgJson.name === "app") pkgJson.name = packageName(basename(cwd));
   writeFileSync(pkgPath, JSON.stringify(pkgJson, null, 2) + "\n");
 
   // 4. Regra de lint do Design System (idempotente).

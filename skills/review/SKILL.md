@@ -2,7 +2,7 @@
 name: review
 description: Etapa de review da esteira. Revisa o PR de uma story numa sessão sem contexto de quem escreveu, com o checklist do revisor da esteira (spec × código, dados, segurança, testes de aceite, DS, Next 16), confere o CI e a rastreabilidade, publica o resultado como comentário de review no PR e devolve a decisão de merge para a pessoa (o gate humano). Use quando a pessoa disser "/esteira:review", "revisar o PR #N", ou quando o /esteira:status indicar esta etapa.
 argument-hint: "[número do PR — padrão: o PR da story em review]"
-allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(gh pr view *) Bash(gh pr checks *) Bash(gh pr review *) Bash(git diff *) Bash(git log *) Bash(npm run *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(gh pr view *) PowerShell(gh pr checks *) PowerShell(gh pr review *) PowerShell(git diff *) PowerShell(git log *) PowerShell(npm run *) Read Write Glob Grep
+allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(gh pr view *) Bash(gh pr checks *) Bash(gh pr review *) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(npm run *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(gh pr view *) PowerShell(gh pr checks *) PowerShell(gh pr review *) PowerShell(git diff *) PowerShell(git log *) PowerShell(git show *) PowerShell(npm run *) Read Write Glob Grep
 ---
 
 # /esteira:review

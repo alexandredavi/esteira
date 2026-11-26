@@ -23,7 +23,8 @@ const api = (cwd, path) => {
 /** Status "Vercel" de um commit (ref = branch ou sha). null = sem deploy da Vercel. */
 export function vercelStatus(cwd, ref) {
   const combined = api(cwd, `repos/{owner}/{repo}/commits/${ref}/status`);
-  const s = (combined?.statuses ?? []).find((x) => /^vercel/i.test(x.context ?? ""));
+  // Contexto exato "Vercel" (ou "Vercel – <projeto>"); "Vercel Preview Comments" é outro status, sempre verde.
+  const s = (combined?.statuses ?? []).find((x) => /^Vercel(?: [–-] .+)?$/.test(x.context ?? "") && !/preview comments/i.test(x.context ?? ""));
   return s ? { state: s.state, inspect: s.target_url ?? null, description: s.description ?? null } : null;
 }
 
@@ -55,10 +56,11 @@ export function deployStatus(opts = {}) {
   const prodStatus = vercelStatus(cwd, main);
   const production = prodStatus ? { ref: main, ...prodStatus } : null;
 
-  const prsOut = gh(cwd, "pr", "list", "--state", "open", "--json", "number,headRefName,title");
+  const prsOut = gh(cwd, "pr", "list", "--state", "open", "--json", "number,headRefName,headRefOid,title");
   const prs = prsOut.ok ? JSON.parse(prsOut.out || "[]") : [];
   const previews = prs.map((pr) => {
-    const st = vercelStatus(cwd, pr.headRefName);
+    // Pelo SHA do head: nome de branch de fork pode coincidir com um branch daqui (ex.: main) ou ter # ? %.
+    const st = vercelStatus(cwd, pr.headRefOid ?? encodeURIComponent(pr.headRefName));
     return { pr: pr.number, title: pr.title, ref: pr.headRefName, state: st?.state ?? "sem deploy", url: st ? previewUrl(cwd, pr.number) : null, inspect: st?.inspect ?? null };
   });
 

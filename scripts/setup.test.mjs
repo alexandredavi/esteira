@@ -89,3 +89,14 @@ test("dry-run F6: nome do pacote vem da pasta do repo (não 'app' do diretório 
   assert.equal(packageName("Meu Produto!"), "meu-produto");
   assert.equal(packageName("___"), "app");
 });
+
+test("revisão F6: ao retomar, o pacote 'app' também ganha o nome do repo", () => {
+  const dir = halfApp();
+  const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
+  pkg.name = "app";
+  writeFileSync(join(dir, "package.json"), JSON.stringify(pkg));
+  setup({ cwd: dir, "skip-install": true });
+  const name = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")).name;
+  assert.notEqual(name, "app");
+  assert.match(name, /^esteira-setup-half-/);
+});

@@ -22,14 +22,14 @@ beforeEach(() => {
 test("produção pelo status Vercel da main; preview pelo status do head e URL do comentário do bot", () => {
   process.env.ESTEIRA_FAKE_GH_API = JSON.stringify({
     "repos/{owner}/{repo}/commits/main/status": { statuses: [{ context: "ci", state: "success" }, vercel("success", "PROD")] },
-    "repos/{owner}/{repo}/commits/docs/no-ar/status": { statuses: [vercel("success", "PREV")] },
+    "repos/{owner}/{repo}/commits/sha27/status": { statuses: [vercel("success", "PREV")] },
     "repos/{owner}/{repo}/issues/27/comments?per_page=50": [
       { user: { login: "outra-pessoa" }, body: "https://nao-e-esse.vercel.app" },
       { user: { login: "vercel[bot]" }, body: "| Preview | [Visit](https://app-git-docs-no-ar-eu.vercel.app) |" },
     ],
-    "repos/{owner}/{repo}/commits/feat/9-x/status": { statuses: [] },
+    "repos/{owner}/{repo}/commits/sha28/status": { statuses: [] },
   });
-  process.env.ESTEIRA_FAKE_GH_PRS = JSON.stringify([{ number: 27, headRefName: "docs/no-ar", title: "docs" }, { number: 28, headRefName: "feat/9-x", title: "feat" }]);
+  process.env.ESTEIRA_FAKE_GH_PRS = JSON.stringify([{ number: 27, headRefName: "docs/no-ar", headRefOid: "sha27", title: "docs" }, { number: 28, headRefName: "feat/9-x", headRefOid: "sha28", title: "feat" }]);
   const r = deployStatus({ cwd: repo() });
   assert.equal(r.ok, true);
   assert.equal(r.vercel, "conectada");
@@ -47,4 +47,17 @@ test("sem status da Vercel em lugar nenhum: não conectada, com aviso; build sem
   assert.equal(r.vercel, "não conectada");
   assert.equal(r.production, null);
   assert.equal(r.notes.length, 2);
+});
+
+test("revisão F6: 'Vercel Preview Comments' verde não mascara o deploy que falhou; fork com branch main usa o SHA", () => {
+  process.env.ESTEIRA_FAKE_GH_API = JSON.stringify({
+    "repos/{owner}/{repo}/commits/main/status": { statuses: [vercel("success", "PROD")] },
+    "repos/{owner}/{repo}/commits/forksha/status": { statuses: [{ context: "Vercel Preview Comments", state: "success" }, vercel("failure", "FORK")] },
+    "repos/{owner}/{repo}/issues/30/comments?per_page=50": [],
+  });
+  process.env.ESTEIRA_FAKE_GH_PRS = JSON.stringify([{ number: 30, headRefName: "main", headRefOid: "forksha", title: "de um fork" }]);
+  const r = deployStatus({ cwd: repo() });
+  assert.equal(r.previews[0].state, "failure");
+  assert.equal(r.previews[0].inspect, "https://vercel.com/eu/app/FORK");
+  assert.equal(r.production.inspect, "https://vercel.com/eu/app/PROD");
 });
