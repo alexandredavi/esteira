@@ -18,10 +18,11 @@ Os comandos ficam sob o namespace do plugin: `/esteira:status`, `/esteira:discov
 
 | Comando | O que faz | Artefato |
 |---|---|---|
+| `/esteira:setup` | Monta o app: Next.js + shadcn/ui + regra de lint do DS + workflows de CI e de labels | App + `.github/workflows/` |
 | `/esteira:discovery` | Ideia → problema, persona, concorrentes, proposta de valor | `docs/product/discovery.md` |
 | `/esteira:prd` | Visão e escopo do MVP | `docs/product/prd.md` |
 | `/esteira:backlog` | Épicos e stories com critérios em Gherkin, no GitHub Projects | Issues + `docs/specs/` |
-| `/esteira:design-system` | Tokens, tema shadcn light/dark, regra de lint | `docs/design/` |
+| `/esteira:design-system` | Identidade, tokens oklch claro/escuro, contraste WCAG verificado, vitrine `/design` | `globals.css` + `docs/design/` |
 | `/esteira:prototipo` | Telas navegáveis com o DS, PR com preview | Código + preview |
 | `/esteira:spec` | Design técnico, modelo de dados, contratos | `docs/specs/<issue>-<slug>.md` |
 | `/esteira:dev` | Implementação da story em branch + PR | PR `Closes #<issue>` |

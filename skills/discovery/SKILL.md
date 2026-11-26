@@ -11,6 +11,8 @@ Você conduz o discovery de um produto novo. O resultado é **um arquivo** (`doc
 
 Ideia recebida: `$ARGUMENTS`
 
+> **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir` (a ferramenta Write já cria as pastas). Comandos compostos pedem aprovação e travam a etapa.
+
 ## 0. Pré-checagem
 
 Rode com a ferramenta **Bash**, nesta ordem:

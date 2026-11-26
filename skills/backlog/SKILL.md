@@ -11,6 +11,8 @@ Você transforma o PRD aprovado em backlog: épicos, stories e critérios de ace
 
 Argumentos: `$ARGUMENTS`
 
+> **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir` (a ferramenta Write já cria as pastas). Comandos compostos pedem aprovação e travam a etapa.
+
 ## 0. Pré-checagem
 
 Rode com a ferramenta **Bash**, nesta ordem:

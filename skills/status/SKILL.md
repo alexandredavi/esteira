@@ -20,10 +20,10 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs $ARGUMENTS .
 (se `$ARGUMENTS` vier vazio, o `.` final aponta para o diretório atual). A saída é JSON com:
 
 - `defaultBranch` / `comparedTo` — o branch padrão e a ref usada como "aprovado" (com remoto, `origin/<padrão>` depois de um `git fetch`)
-- `artifacts.{discovery,prd,backlog,designSystem}` — `merged` (está no branch padrão; para o backlog, `docs/specs/`), `pendingPr` (PR de gate aberto) e `pendingBranch` (gate só local, sem GitHub)
+- `artifacts.{app,discovery,prd,backlog,designSystem}` — `merged` (está no branch padrão; para o backlog, `docs/specs/`), `pendingPr` (PR de gate aberto) e `pendingBranch` (gate só local, sem GitHub)
 - `github` — `"ok"` ou o motivo de não conseguir ler issues/PRs
 - `summary` — contagem de épicos e stories por estágio
-- `stories[]` — `number`, `title`, `stage` (`backlog` → `design-approved` → `ready-for-dev` → `in-review` → `done`), `pr`
+- `stories[]` — `number`, `title`, `stage` (`backlog` → `design-review` → `design-approved` → `spec-review` → `ready-for-dev` → `in-review` → `done`), `pr` (o PR de gate ou de dev aberto)
 - `next` — `action` (`run` | `merge` | `setup`), `command`, `reason`
 
 Não reinterprete o estado por conta própria: o script é a fonte da verdade. Se ele falhar, mostre o erro e pare.
@@ -37,11 +37,12 @@ Responda em PT-BR, curto, neste formato:
 
 | Etapa | Estado |
 |---|---|
-| Discovery | ✅ mergeado / 🔶 PR #n (ou branch) aguardando merge / ⬜ pendente |
+| App (setup) | ✅ mergeado / 🔶 PR #n (ou branch) aguardando merge / ⬜ pendente |
+| Discovery | … |
 | PRD | … |
 | Backlog | <n> épicos, <n> stories + estado das specs (✅ / 🔶 PR #n / ⬜) |
 | Design System | … |
-| Stories | backlog <n> · protótipo aprovado <n> · prontas p/ dev <n> · em review <n> · concluídas <n> |
+| Stories | backlog <n> · protótipo em review <n> · protótipo aprovado <n> · spec em review <n> · prontas p/ dev <n> · em review <n> · concluídas <n> |
 
 **Próximo passo:** `<next.command>` — <next.reason>
 ```
