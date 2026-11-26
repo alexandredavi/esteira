@@ -10,8 +10,8 @@ jobs:
     name: Testes dos scripts + validação do plugin
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
       - run: npm test
@@ -27,8 +27,8 @@ jobs:
     # Só roda quando o secret existe (forks e PRs externos não têm acesso).
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
       - name: Instalar Claude Code
@@ -47,7 +47,7 @@ jobs:
             --no-publish \
             --max-cost-usd 5 \
             --json eval-results.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: ${{ always() && hashFiles('eval-results.json') != '' }}
         with:
           name: eval-results
