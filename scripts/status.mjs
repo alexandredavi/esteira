@@ -86,11 +86,12 @@ const has = (item, label) => labelNames(item).includes(label);
 function storyStage(story, prsByIssue, gatesByIssue = new Map()) {
   if (story.state === "CLOSED") return "done";
   if (prsByIssue.has(story.number)) return "in-review";
+  // Um PR de gate aberto (inclusive revisão de algo já aprovado) vence a label: o próximo passo é o merge dele.
   const gate = gatesByIssue.get(story.number);
-  if (has(story, "ready-for-dev") || has(story, "spec:approved")) return "ready-for-dev";
   if (gate?.stage === "spec-review") return "spec-review";
-  if (has(story, "design:approved")) return "design-approved";
+  if (has(story, "ready-for-dev") || has(story, "spec:approved")) return "ready-for-dev";
   if (gate?.stage === "design-review") return "design-review";
+  if (has(story, "design:approved")) return "design-approved";
   return "backlog";
 }
 
@@ -126,7 +127,9 @@ export function collect(cwd) {
     const ref = { number: pr.number, url: pr.url };
     const gate = parseGateMarker(pr.body);
     if (gate && GATE_REVIEW_STAGE[gate.stage]) {
-      for (const n of gate.stories) gatesByIssue.set(n, { ...ref, stage: GATE_REVIEW_STAGE[gate.stage] });
+      const stage = GATE_REVIEW_STAGE[gate.stage];
+      // Dois gates abertos para a mesma story: o de spec (etapa mais avançada) prevalece.
+      for (const n of gate.stories) if (gatesByIssue.get(n)?.stage !== "spec-review") gatesByIssue.set(n, { ...ref, stage });
     } else {
       for (const n of linkedIssues(pr)) prsByIssue.set(n, ref);
     }

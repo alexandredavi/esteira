@@ -68,8 +68,27 @@ test("readVars não confunde :root com seletores parecidos", () => {
   assert.deepEqual(readVars(":root{--a: oklch(1 0 0);}", ":root"), { a: "oklch(1 0 0)" });
 });
 
-test("o tema padrão do shadcn (base-nova neutro) reprova muted-foreground sobre muted no claro (4.34:1)", () => {
+test("o tema padrão do shadcn (base-nova neutro) reprova muted-foreground sobre muted no claro (4.33:1)", () => {
   const shadcn = css("oklch(0.985 0 0)").replace("--primary: oklch(0.55 0.2 260)", "--primary: oklch(0.205 0 0)").replace("--muted-foreground: oklch(0.5 0 0)", "--muted-foreground: oklch(0.556 0 0)");
   const r = check(shadcn);
-  assert.deepEqual(r.failures.map((f) => [f.theme, f.fg, f.bg, f.ratio]), [["light", "muted-foreground", "muted", 4.34]]);
+  assert.deepEqual(r.failures.map((f) => [f.theme, f.fg, f.bg, f.ratio]), [["light", "muted-foreground", "muted", 4.33]]);
+});
+
+test("revisão F2: comentário antes do seletor, lista de seletores e @custom-variant", () => {
+  assert.deepEqual(readVars("/* tokens */ :root { --a: oklch(1 0 0); }", ":root"), { a: "oklch(1 0 0)" });
+  assert.deepEqual(readVars(":root, .light { --a: oklch(1 0 0); }", ":root"), { a: "oklch(1 0 0)" });
+  assert.equal(readVars("@custom-variant dark (&:is(.dark *));\n:root { --a: 1; }", ".dark"), null);
+});
+
+test("revisão F2: vários blocos :root são mesclados, o último vence", () => {
+  assert.deepEqual(readVars(":root{--x:1;}\n:root { --a: oklch(1 0 0); --x: 2; }", ":root"), { x: "2", a: "oklch(1 0 0)" });
+  const r = check(":root{--x:1;}\n" + css("oklch(0.985 0 0)"));
+  assert.equal(r.ok, true, JSON.stringify(r.failures));
+});
+
+test("revisão F2: razão é comparada sem arredondar para cima", () => {
+  const r = check(css("oklch(0.985 0 0)").replace("--muted-foreground: oklch(0.5 0 0)", "--muted-foreground: oklch(0.556 0 0)"));
+  const pair = r.themes.light.find((p) => p.fg === "muted-foreground" && p.bg === "muted");
+  assert.equal(pair.pass, false);
+  assert.ok(pair.ratio < 4.5);
 });

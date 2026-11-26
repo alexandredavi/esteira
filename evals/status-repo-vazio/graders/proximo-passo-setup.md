@@ -1,5 +1,5 @@
 ---
 type: regex
-pattern: '/esteira:discovery'
+pattern: '/esteira:setup'
 match: contains
 ---

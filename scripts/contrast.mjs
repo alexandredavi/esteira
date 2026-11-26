@@ -65,14 +65,22 @@ export function contrast(c1, c2) {
   return (a + 0.05) / (b + 0.05);
 }
 
-/** Extrai as variáveis de um bloco (":root" ou ".dark") do CSS. */
+/**
+ * Extrai as variáveis de todos os blocos de regra cuja lista de seletores contém `selector`
+ * (":root" ou ".dark"), em ordem — o último vence, como no CSS. Ignora comentários e at-rules
+ * (ex.: "@custom-variant dark (&:is(.dark *));" não é um bloco .dark).
+ */
 export function readVars(css, selector) {
-  const re = new RegExp(`(^|\\n)\\s*${selector.replace(".", "\\.")}\\s*\\{([^}]*)\\}`);
-  const block = re.exec(css)?.[2];
-  if (!block) return null;
+  const clean = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  let found = false;
   const vars = {};
-  for (const m of block.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) vars[m[1]] = m[2].trim();
-  return vars;
+  for (const m of clean.matchAll(/([^{};]+)\{([^{}]*)\}/g)) {
+    const selectors = m[1].split(",").map((s) => s.trim());
+    if (!selectors.includes(selector)) continue;
+    found = true;
+    for (const d of m[2].matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) vars[d[1]] = d[2].trim();
+  }
+  return found ? vars : null;
 }
 
 export function check(css) {
@@ -85,8 +93,9 @@ export function check(css) {
       const a = vars[fg] && parseColor(vars[fg]);
       const b = vars[bg] && parseColor(vars[bg]);
       if (!a || !b) return { fg, bg, min, ratio: null, pass: false, note: `não consegui ler ${!a ? fg : bg} (${vars[!a ? fg : bg] ?? "ausente"})` };
-      const ratio = Math.round(contrast(a, b) * 100) / 100;
-      return { fg, bg, min, ratio, pass: ratio >= min };
+      const exact = contrast(a, b);
+      // Compara o valor exato: 4.495 arredondado para 4.5 não pode passar.
+      return { fg, bg, min, ratio: Math.floor(exact * 100) / 100, pass: exact >= min };
     });
     for (const r of themes[theme]) if (!r.pass) failures.push({ theme, ...r });
   }

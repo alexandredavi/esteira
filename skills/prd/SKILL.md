@@ -24,9 +24,9 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs .
 
 O `sync` volta para o branch padrão e traz o que foi mergeado no GitHub (só se não houver mudanças não commitadas). Se ele responder `blocking: true`, mostre o `reason` e pergunte antes de seguir. Com `synced: false` e `blocking: false` (ex.: não é repo git), siga normalmente.
 
-Se a etapa anterior tiver `pendingBranch` (gate só local, sem GitHub), o próximo passo é a pessoa mergear esse branch no padrão: mostre o `next` e pare.
+Se `artifacts.discovery.pendingBranch` existir (gate só local, sem GitHub), a pessoa precisa mergear esse branch no padrão antes: diga isso e pare.
 
-- `artifacts.discovery.merged` é `false` → o PRD depende do discovery aprovado. Mostre o `next` (rodar `/esteira:discovery` ou mergear o PR dele) e **pare**.
+- `artifacts.discovery.merged` é `false` → o PRD depende do discovery aprovado. Diga que falta o discovery (rodar `/esteira:discovery` ou mergear o PR dele) e **pare**. Não use o `next` aqui: ele pode apontar para o `/esteira:setup`, que o PRD não exige.
 - `artifacts.prd.merged` é `true` → o PRD já está aprovado. Mostre o `next` e pare.
 - `artifacts.prd.pendingPr` existe → pergunte se a pessoa quer revisar o arquivo existente ou parar. Para revisar: rode `node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs . --to docs/prd` para voltar ao branch do PR, edite e rode o passo 4 de novo, que atualiza o mesmo PR.
 

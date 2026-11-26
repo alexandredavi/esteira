@@ -55,92 +55,125 @@ export function addScripts(pkg) {
   return pkg;
 }
 
-// Copia src → dst sem sobrescrever; devolve os caminhos de primeiro nível criados.
-function mergeTree(src, dst, created = new Set(), top = true) {
+// Copia src → dst sem sobrescrever.
+function mergeTree(src, dst) {
   for (const name of readdirSync(src, { withFileTypes: true })) {
     if (SKIP.has(name.name)) continue;
     const from = join(src, name.name);
     const to = join(dst, name.name);
     if (name.isDirectory()) {
-      if (!existsSync(to)) { cpSync(from, to, { recursive: true }); if (top) created.add(name.name); }
-      else mergeTree(from, to, created, false);
+      if (!existsSync(to)) cpSync(from, to, { recursive: true });
+      else mergeTree(from, to);
     } else if (!existsSync(to)) {
       mkdirSync(dirname(to), { recursive: true });
       cpSync(from, to);
-      if (top) created.add(name.name);
     }
   }
-  return created;
 }
 
-function writeIfMissing(cwd, rel, content, created) {
+function writeIfMissing(cwd, rel, content) {
   const abs = join(cwd, rel);
   if (existsSync(abs)) return false;
   mkdirSync(dirname(abs), { recursive: true });
   writeFileSync(abs, content);
-  created.add(rel);
   return true;
 }
 
+// Tudo o que o setup cria ou altera no repo: é o que vai para o commit do gate (filtrado pelo que existe).
+export const SETUP_PATHS = [
+  ".github/workflows/ci.yml", ".github/workflows/esteira-gates.yml", ".gitignore", "AGENTS.md", "CLAUDE.md",
+  "components.json", "eslint-rules", "eslint.config.mjs", "next-env.d.ts", "next.config.ts", "package.json",
+  "package-lock.json", "postcss.config.mjs", "public", "src", "tsconfig.json",
+];
+
+const readJson = (p) => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };
+const isNextApp = (pkg) => Boolean(pkg?.dependencies?.next ?? pkg?.devDependencies?.next);
+
+/** O que ainda falta num repo (vazio = setup completo). */
+export function missingParts(cwd) {
+  const missing = [];
+  const pkg = readJson(join(cwd, "package.json"));
+  if (!pkg) return ["app"];
+  if (!pkg.scripts?.typecheck) missing.push("typecheck");
+  if (!existsSync(join(cwd, "eslint-rules/esteira-ds.mjs"))) missing.push("regra do DS");
+  const eslint = join(cwd, "eslint.config.mjs");
+  if (!existsSync(eslint) || !readFileSync(eslint, "utf8").includes("esteira-ds")) missing.push("ESLint com a regra do DS");
+  for (const wf of ["ci.yml", "esteira-gates.yml"]) if (!existsSync(join(cwd, ".github/workflows", wf))) missing.push(`workflow ${wf}`);
+  if (!existsSync(join(cwd, "node_modules"))) missing.push("dependências");
+  if (!existsSync(join(cwd, "components.json"))) missing.push("shadcn");
+  return missing;
+}
+
+const pathsIn = (cwd) => SETUP_PATHS.filter((p) => existsSync(join(cwd, p)));
+
 export function setup(opts = {}) {
   const cwd = resolve(opts.cwd ?? process.cwd());
-  if (existsSync(join(cwd, "package.json"))) {
-    return { ok: true, already: true, reason: "Já existe package.json: o app já foi montado. Nada a fazer." };
-  }
   const steps = [];
-  const created = new Set();
+  const fail = (error) => ({ ok: false, error, steps, paths: pathsIn(cwd), resumable: existsSync(join(cwd, "package.json")) });
+  const pkgPath = join(cwd, "package.json");
+  const existing = readJson(pkgPath);
+  if (existsSync(pkgPath) && !isNextApp(existing)) {
+    return { ok: false, error: "Já existe um package.json que não é de um app Next.js. O setup da esteira não se aplica a este repo." };
+  }
+  const missing = missingParts(cwd);
+  if (missing.length === 0) return { ok: true, already: true, reason: "O app já está montado e completo. Nada a fazer.", paths: pathsIn(cwd) };
+  const resumed = Boolean(existing);
+  if (resumed) steps.push(`retomando um setup incompleto (faltava: ${missing.join(", ")})`);
 
   // 1. Next.js num diretório temporário (o create-next-app recusa diretórios com arquivos que não conhece).
-  const tmp = mkdtempSync(join(tmpdir(), "esteira-setup-"));
-  const app = join(tmp, "app");
-  const cna = sh("npx", ["--yes", `create-next-app@${VERSIONS["create-next-app"]}`, app,
-    "--ts", "--tailwind", "--eslint", "--app", "--src-dir", "--import-alias", "@/*", "--use-npm",
-    "--yes", "--disable-git", "--no-agent-feedback", "--empty", "--skip-install"], tmp);
-  if (!cna.ok) return { ok: false, error: `create-next-app falhou: ${cna.err.slice(-800)}` };
-  steps.push(`create-next-app@${VERSIONS["create-next-app"]}`);
+  if (!existing) {
+    const tmp = mkdtempSync(join(tmpdir(), "esteira-setup-"));
+    try {
+      const app = join(tmp, "app");
+      const cna = sh("npx", ["--yes", `create-next-app@${VERSIONS["create-next-app"]}`, app,
+        "--ts", "--tailwind", "--eslint", "--app", "--src-dir", "--import-alias", "@/*", "--use-npm",
+        "--yes", "--disable-git", "--no-agent-feedback", "--empty", "--skip-install"], tmp);
+      if (!cna.ok) return fail(`create-next-app falhou: ${cna.err.slice(-800)}`);
+      steps.push(`create-next-app@${VERSIONS["create-next-app"]}`);
 
-  // 2. Mescla no repo sem sobrescrever; .gitignore é unido.
-  const gi = join(cwd, ".gitignore");
-  const incomingGi = existsSync(join(app, ".gitignore")) ? readFileSync(join(app, ".gitignore"), "utf8") : "";
-  const currentGi = existsSync(gi) ? readFileSync(gi, "utf8") : "";
-  mergeTree(app, cwd, created);
-  writeFileSync(gi, mergeGitignore(currentGi, incomingGi));
-  created.add(".gitignore");
-  rmSync(tmp, { recursive: true, force: true });
-  steps.push("app mesclado no repo");
+      // 2. Mescla no repo sem sobrescrever; .gitignore é unido.
+      const gi = join(cwd, ".gitignore");
+      const incomingGi = existsSync(join(app, ".gitignore")) ? readFileSync(join(app, ".gitignore"), "utf8") : "";
+      const currentGi = existsSync(gi) ? readFileSync(gi, "utf8") : "";
+      mergeTree(app, cwd);
+      writeFileSync(gi, mergeGitignore(currentGi, incomingGi));
+      steps.push("app mesclado no repo");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
 
-  // 3. Script de typecheck.
-  const pkgPath = join(cwd, "package.json");
+  // 3. Script de typecheck (idempotente).
   writeFileSync(pkgPath, JSON.stringify(addScripts(JSON.parse(readFileSync(pkgPath, "utf8"))), null, 2) + "\n");
 
-  // 4. Regra de lint do Design System.
-  writeIfMissing(cwd, "eslint-rules/esteira-ds.mjs", readFileSync(join(TEMPLATES, "eslint-rules/esteira-ds.mjs"), "utf8"), created);
+  // 4. Regra de lint do Design System (idempotente).
+  writeIfMissing(cwd, "eslint-rules/esteira-ds.mjs", readFileSync(join(TEMPLATES, "eslint-rules/esteira-ds.mjs"), "utf8"));
   const eslintPath = join(cwd, "eslint.config.mjs");
+  if (!existsSync(eslintPath)) return fail("eslint.config.mjs não encontrado: o app não foi gerado com --eslint.");
   writeFileSync(eslintPath, patchEslintConfig(readFileSync(eslintPath, "utf8")));
   steps.push("regra esteira-ds/no-raw-styles registrada no ESLint");
 
-  // 5. Workflows: CI e labels dos gates.
+  // 5. Workflows: CI e labels dos gates (não sobrescreve).
   for (const wf of ["ci.yml", "esteira-gates.yml"]) {
-    writeIfMissing(cwd, `.github/workflows/${wf}`, readFileSync(join(TEMPLATES, "workflows", wf), "utf8"), created);
+    writeIfMissing(cwd, `.github/workflows/${wf}`, readFileSync(join(TEMPLATES, "workflows", wf), "utf8"));
   }
   steps.push("workflows ci.yml e esteira-gates.yml");
 
-  // 6. Dependências e shadcn/ui.
+  // 6. Dependências e shadcn/ui. Cada passo é idempotente: rodar de novo depois de uma falha completa o que faltou.
   if (!opts["skip-install"]) {
     const install = sh("npm", ["install", "--no-audit", "--no-fund"], cwd);
-    if (!install.ok) return { ok: false, error: `npm install falhou: ${install.err.slice(-800)}`, steps };
+    if (!install.ok) return fail(`npm install falhou: ${install.err.slice(-800)}. Rode /esteira:setup de novo para retomar.`);
     steps.push("npm install");
-    const init = sh("npx", ["--yes", `shadcn@${VERSIONS.shadcn}`, "init", "-d", "-y"], cwd);
-    if (!init.ok) return { ok: false, error: `shadcn init falhou: ${init.err.slice(-800)}`, steps };
+    if (!existsSync(join(cwd, "components.json"))) {
+      const init = sh("npx", ["--yes", `shadcn@${VERSIONS.shadcn}`, "init", "-d", "-y"], cwd);
+      if (!init.ok) return fail(`shadcn init falhou: ${init.err.slice(-800)}. Rode /esteira:setup de novo para retomar.`);
+    }
     const add = sh("npx", ["--yes", `shadcn@${VERSIONS.shadcn}`, "add", ...UI_COMPONENTS, "-y"], cwd);
-    if (!add.ok) return { ok: false, error: `shadcn add falhou: ${add.err.slice(-800)}`, steps };
+    if (!add.ok) return fail(`shadcn add falhou: ${add.err.slice(-800)}. Rode /esteira:setup de novo para retomar.`);
     steps.push(`shadcn@${VERSIONS.shadcn} init + ${UI_COMPONENTS.length} componentes`);
-    created.add("components.json");
-    created.add("package-lock.json");
   }
 
-  const paths = [...created].map((p) => p.replace(/\\/g, "/")).filter((p) => existsSync(join(cwd, p))).sort();
-  return { ok: true, already: false, versions: VERSIONS, steps, paths, components: UI_COMPONENTS };
+  return { ok: true, already: false, resumed, versions: VERSIONS, steps, paths: pathsIn(cwd), components: UI_COMPONENTS };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

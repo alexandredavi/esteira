@@ -4,15 +4,21 @@
 //
 // Instalado por /esteira:setup em eslint-rules/esteira-ds.mjs e registrado em eslint.config.mjs.
 
-const COLOR_UTILS = "bg|text|border|border-[trblxy]|ring|ring-offset|outline|fill|stroke|from|via|to|decoration|accent|caret|placeholder|divide|shadow";
+const COLOR_UTILS = "bg|text|border|border-[trblxyse]|ring|ring-offset|outline|fill|stroke|from|via|to|decoration|accent|caret|placeholder|divide|shadow|text-shadow|drop-shadow|inset-shadow|inset-ring";
 const PALETTE = "slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose";
 const SPACING_UTILS = "p|px|py|pt|pr|pb|pl|ps|pe|m|mx|my|mt|mr|mb|ml|ms|me|gap|gap-x|gap-y|space-x|space-y";
+// Modificador de opacidade: /50, /[.3], /(--o)
+const OPACITY = "(?:/(?:\\d+|\\[[^\\]]+\\]|\\([^)]+\\)))?";
+// Conteúdo de colchete que é cor. Larguras, porcentagens e imagens (url) não são.
+// ATENÇÃO: o Tailwind v4 varre este arquivo atrás de classes. Não escreva exemplos com url() entre
+// colchetes aqui: viram CSS com url(...) e o build do Next quebra ("Can't resolve '...'").
+const COLOR_VALUE = "(?:#|rgba?\\(|hsla?\\(|oklch\\(|oklab\\(|lab\\(|lch\\(|hwb\\(|color(?:-mix)?[:(]|var\\(--)";
 
 const RULES = [
-  { re: /^text-\[\d/, reason: "tamanho de fonte arbitrário; use a escala tipográfica (text-sm, text-lg…)" },
-  { re: new RegExp(`^-?(?:${COLOR_UTILS})-(?:${PALETTE})-\\d{2,3}(?:/\\d+)?$`), reason: "cor da paleta crua do Tailwind; use um token do DS (ex.: bg-primary, text-muted-foreground)" },
-  { re: new RegExp(`^(?:${COLOR_UTILS})-(?:black|white)(?:/\\d+)?$`), reason: "preto/branco cru; use um token do DS (ex.: bg-background, text-primary-foreground)" },
-  { re: new RegExp(`^(?:${COLOR_UTILS})-\\[`), reason: "cor arbitrária; use um token do DS ou crie um token em globals.css" },
+  { re: /^text-\[(?:\d|length:)/, reason: "tamanho de fonte arbitrário; use a escala tipográfica (text-sm, text-lg…)" },
+  { re: new RegExp(`^-?(?:${COLOR_UTILS})-(?:${PALETTE})-\\d{2,3}${OPACITY}$`), reason: "cor da paleta crua do Tailwind; use um token do DS (ex.: bg-primary, text-muted-foreground)" },
+  { re: new RegExp(`^(?:${COLOR_UTILS})-(?:black|white)${OPACITY}$`), reason: "preto/branco cru; use um token do DS (ex.: bg-background, text-primary-foreground)" },
+  { re: new RegExp(`^(?:${COLOR_UTILS})-\\[${COLOR_VALUE}`, "i"), reason: "cor arbitrária; use um token do DS ou crie um token em globals.css" },
   { re: new RegExp(`^-?(?:${SPACING_UTILS})-\\[`), reason: "espaçamento arbitrário; use a escala do Tailwind (p-4, gap-2…)" },
   { re: /^rounded(?:-[a-z]{1,2})?-\[/, reason: "raio arbitrário; use rounded-sm/md/lg/xl (derivados de --radius)" },
   { re: /^font-\[/, reason: "fonte arbitrária; use font-sans/font-heading do DS" },
@@ -49,8 +55,12 @@ const CLASS_FNS = new Set(["cn", "clsx", "cva", "twMerge", "classNames"]);
 function strings(node, acc = []) {
   if (!node || typeof node !== "object") return acc;
   if (node.type === "Literal" && typeof node.value === "string") acc.push({ node, value: node.value });
-  else if (node.type === "TemplateLiteral") for (const q of node.quasis) acc.push({ node: q, value: q.value.cooked ?? "" });
+  else if (node.type === "TemplateLiteral") {
+    for (const q of node.quasis) acc.push({ node: q, value: q.value.cooked ?? "" });
+    for (const e of node.expressions) strings(e, acc);
+  }
   else if (node.type === "JSXExpressionContainer") strings(node.expression, acc);
+  else if (node.type === "TSAsExpression" || node.type === "TSSatisfiesExpression" || node.type === "TSNonNullExpression") strings(node.expression, acc);
   else if (node.type === "ConditionalExpression") { strings(node.consequent, acc); strings(node.alternate, acc); }
   else if (node.type === "LogicalExpression") { strings(node.left, acc); strings(node.right, acc); }
   else if (node.type === "ArrayExpression") for (const e of node.elements) strings(e, acc);

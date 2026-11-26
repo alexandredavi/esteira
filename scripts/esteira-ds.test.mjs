@@ -68,3 +68,33 @@ test("className={cn(...)} não reporta em dobro: quem reporta é o visitante da 
   const other = { type: "CallExpression", callee: { type: "Identifier", name: "pick" }, arguments: [lit("text-white")] };
   assert.deepEqual(lint("JSXAttribute", { name: { name: "className" }, value: { type: "JSXExpressionContainer", expression: other } }), ["raw:text-white"]);
 });
+
+test("revisão F2: valores arbitrários que não são cor passam", () => {
+  assert.deepEqual(v("stroke-[1.5] border-[2px] ring-[3px] outline-[2px] decoration-[3px] to-[50%] from-[10%] bg-[url(/x.png)] border-l-[3px]"), []);
+});
+
+test("revisão F2: cor arbitrária em várias formas é barrada", () => {
+  assert.deepEqual(bad("fill-[#000] stroke-[rgb(0,0,0)] bg-[oklch(0.5_0.1_20)] text-[var(--minha-cor)] border-[color:var(--x)] bg-[hsl(10_50%_50%)]"),
+    ["fill-[#000]", "stroke-[rgb(0,0,0)]", "bg-[oklch(0.5_0.1_20)]", "text-[var(--minha-cor)]", "border-[color:var(--x)]", "bg-[hsl(10_50%_50%)]"]);
+  assert.match(v("text-[length:13px]")[0].reason, /tamanho de fonte/);
+});
+
+test("revisão F2: modificadores de opacidade e utilidades novas", () => {
+  assert.deepEqual(bad("bg-red-500/[.3] text-red-500/[0.5] bg-black/[.5] bg-red-500/(--o) border-s-red-500 border-e-blue-200 text-shadow-red-500 drop-shadow-red-500 inset-ring-zinc-200 inset-shadow-black"),
+    ["bg-red-500/[.3]", "text-red-500/[0.5]", "bg-black/[.5]", "bg-red-500/(--o)", "border-s-red-500", "border-e-blue-200", "text-shadow-red-500", "drop-shadow-red-500", "inset-ring-zinc-200", "inset-shadow-black"]);
+  assert.deepEqual(v("text-shadow-lg drop-shadow-md shadow-sm inset-shadow-sm border-s border-e-2"), []);
+});
+
+test("revisão F2: expressões dentro de template literal e wrappers de TS", () => {
+  const tpl = { type: "TemplateLiteral", quasis: [{ value: { cooked: "p-4 " } }, { value: { cooked: "" } }],
+    expressions: [{ type: "ConditionalExpression", consequent: lit("bg-red-500"), alternate: lit("") }] };
+  assert.deepEqual(lint("JSXAttribute", { name: { name: "className" }, value: { type: "JSXExpressionContainer", expression: tpl } }), ["raw:bg-red-500"]);
+  const asExpr = { type: "TSAsExpression", expression: lit("text-white") };
+  assert.deepEqual(lint("JSXAttribute", { name: { name: "className" }, value: { type: "JSXExpressionContainer", expression: asExpr } }), ["raw:text-white"]);
+});
+
+test("revisão F2: o arquivo da regra não contém classes com url() (o Tailwind v4 varre o projeto e o build quebra)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../templates/app/eslint-rules/esteira-ds.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /\[url\(/);
+});

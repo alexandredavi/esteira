@@ -122,10 +122,10 @@ Releia o mapa: todo `AC-<n>.<k>` da seção Produto tem uma linha em "Como ver c
 ## 6. Abrir o gate
 
 ```
-node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs --stage prototipo --branch design/<n>-<slug> --stories <n>[,<m>] --title "feat(prototipo): #<n> <título da story>" --paths src,<caminho da spec> --summary "<resumo sem aspas duplas, crases nem $: rotas, quantos ACs cobertos, estados>"
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs --stage prototipo --branch design/<n>-<slug> --stories <n>[,<m>] --title "feat(prototipo): #<n> <título da story>" --paths src,<caminho da spec>,package.json,package-lock.json,components.json --summary "<resumo sem aspas duplas, crases nem $: rotas, quantos ACs cobertos, estados>"
 ```
 
-Com várias stories, use a primeira no nome do branch e todas em `--stories`. Leia o JSON: `opened: true` → link. `opened: false` → `reason`. `ok: false` → `error`.
+`package.json`, `package-lock.json` e `components.json` vão sempre: um `npx shadcn add` pode instalar dependências, e sem elas o `npm ci` do CI e da Vercel quebra. Se nada mudou neles, o gate não os inclui no commit. Com várias stories, use a primeira no nome do branch e todas em `--stories`. Leia o JSON: `opened: true` → link. `opened: false` → `reason`. `ok: false` → `error`.
 
 ## 7. Fechar
 

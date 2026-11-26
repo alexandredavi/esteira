@@ -31,8 +31,10 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/setup.mjs
 
 O script gera o Next.js num diretório temporário e mescla no repo **sem sobrescrever** o que já existe. Depois instala as dependências, roda o shadcn (`init` + componentes base), registra a regra `esteira-ds/no-raw-styles` no ESLint e cria `.github/workflows/ci.yml` e `.github/workflows/esteira-gates.yml`.
 
-- `ok: false` → mostre o `error` e pare.
-- `already: true` → já havia `package.json`. Diga isso e pare.
+- `ok: false` com `resumable: true` → algo falhou no meio (rede, npm, shadcn). Mostre o `error` e diga que **rodar `/esteira:setup` de novo retoma de onde parou**: o script só completa o que falta. Não abra o gate.
+- `ok: false` sem `resumable` → mostre o `error` e pare.
+- `resumed: true` → o setup completou um app que tinha ficado pela metade. Diga isso e siga normalmente.
+- `already: true` → o app já está montado e completo. Se o artefato `app` ainda não estiver mergeado, siga para o passo 2 (verificar) e o passo 3 (gate), usando os `paths` da saída. Senão, diga isso e pare.
 
 ## 2. Verificar
 

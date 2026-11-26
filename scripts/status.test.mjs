@@ -152,3 +152,18 @@ test("design system em PR aberto pede merge antes do protótipo", () => {
   assert.equal(s.next.action, "merge");
   assert.equal(s.next.command, "/esteira:design-system");
 });
+
+test("revisão F2: PR de revisão do protótipo aberto vence a label design:approved", () => {
+  const s = collect(repo({ files: ALL, gh: { issues: [story(10, ["design:approved"])], prs: [gatePr(40, "prototipo", [10])] } }));
+  assert.equal(s.stories[0].stage, "design-review");
+  assert.equal(s.next.action, "merge");
+  assert.equal(s.next.pr.number, 40);
+});
+
+test("revisão F2: dois gates abertos na mesma story — o de spec prevalece em qualquer ordem", () => {
+  for (const prs of [[gatePr(41, "prototipo", [10]), gatePr(42, "spec", [10])], [gatePr(42, "spec", [10]), gatePr(41, "prototipo", [10])]]) {
+    const s = collect(repo({ files: ALL, gh: { issues: [story(10, ["design:approved"])], prs } }));
+    assert.equal(s.stories[0].stage, "spec-review");
+    assert.equal(s.stories[0].pr.number, 42);
+  }
+});

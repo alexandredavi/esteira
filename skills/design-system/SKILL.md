@@ -59,7 +59,7 @@ Rode:
 node ${CLAUDE_PLUGIN_ROOT}/scripts/contrast.mjs
 ```
 
-`ok: false` → ajuste os tokens dos pares em `failures` (normalmente escurecendo o `-foreground` ou o fundo) e rode de novo, até `ok: true`. **Não abra o gate com contraste reprovado.** Atenção: o tema padrão do shadcn já reprova `muted-foreground` sobre `muted` no claro (4.34:1).
+`ok: false` → ajuste os tokens dos pares em `failures` (normalmente escurecendo o `-foreground` ou o fundo) e rode de novo, até `ok: true`. **Não abra o gate com contraste reprovado.** Atenção: o tema padrão do shadcn já reprova `muted-foreground` sobre `muted` no claro (4.33:1).
 
 ## 4. Fonte, idioma e metadados
 
