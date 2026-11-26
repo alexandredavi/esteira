@@ -299,3 +299,16 @@ Conferi as telas no navegador: o timer conta de verdade, e a vitrine mostra os d
 - Errei um filtro `jq` (escape inválido) no script que acompanhava a execução: a reexecução nem aconteceu e o script ficou esperando. Agora toda espera minha tem um limite de tempo.
 
 **Decisão:** o piloto nunca mergeia. O Ep12 mostra a esteira andando sozinha **até o gate humano**, e não além dele.
+
+**Revisão independente da F5** (com foco em segurança):
+
+| # | Gravidade | Problema | Correção |
+|---|---|---|---|
+| 1 | **Alta** | O token pessoal do piloto ficava no ambiente do job inteiro (`npm ci`, scripts de dependências, o modelo). **Nada impedia tecnicamente um push direto na `main`**, pulando o gate humano; com a permissão Workflows, um workflow novo poderia ler os secrets | Token só nos passos que precisam; sem a permissão Workflows; o `piloto-check.mjs` exige **`main` com PR obrigatório e sem bypass** antes de ligar o piloto (garantia técnica, não só instrução) |
+| 2 | Média | Num repo **privado**, a espera pelo CI tomaria 403 e o review nunca rodaria (o repo público do dry-run escondia isso) | A espera usa o `github.token` |
+| 3 | Média | O plugin vem da `main` do marketplace, sem versão fixa | **Aberto:** a CLI não documenta como fixar uma ref no marketplace. Risco registrado |
+| 4 | Média | Disparar duas vezes refazia a story num PR já aberto (custo dobrado, review duplicado) | Pré-checagem: se já há PR aberto, não faz nada (input `force` para forçar); concorrência por label |
+| 5 | Baixa | O número da story não era validado | Precisa ser numérico |
+| 6 | Baixa | `gh run watch` sem `--exit-status` não avisava CI vermelho | Corrigido |
+
+**Erro meu no dry-run:** ao instalar o piloto v4, deixei o número do PR fixo no comando de merge (#35) em vez de usar o que o gate devolveu (#36). O #35 era o **Release PR 0.3.0**, aberto pelo release-please depois da story #9, e eu o mergeei sem que isso tivesse sido pedido; a release **v0.3.0** saiu. O conteúdo é legítimo (só a #9), mas foi um gate de release fora do combinado. Contei ao Alexandre e não desfiz nada sem ele pedir. Regra daqui em diante: o número do PR vem **sempre** da saída do gate, nunca digitado.
