@@ -2,7 +2,7 @@
 name: prototipo
 description: Etapa de protótipo da esteira. Para uma ou mais stories do backlog, constrói telas navegáveis no próprio app (Next.js + componentes e tokens do Design System), com dados mock e os estados vazio/carregando/erro, mapeia cada critério de aceite para onde ele aparece, preenche a seção Design da spec e abre o PR de gate (o merge aplica design:approved). Use quando a pessoa disser "/esteira:prototipo", "prototipar a story #N", "fazer as telas", ou quando o /esteira:status indicar esta etapa.
 argument-hint: "[número(s) da(s) story(ies) — padrão: a próxima do backlog]"
-allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Bash(npm run *) Bash(npx shadcn@4.23.1 add *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(npm run *) PowerShell(npx shadcn@4.23.1 add *) Read Write Edit Glob Grep AskUserQuestion
+allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Bash(npm run *) Bash(npx shadcn@4.23.1 add *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(npm run *) PowerShell(npx shadcn@4.23.1 add *) Bash(git rm *) PowerShell(git rm *) Read Write Edit Glob Grep AskUserQuestion
 ---
 
 # /esteira:prototipo
@@ -11,7 +11,7 @@ Você prototipa a experiência de uma story **no próprio app**, em código real
 
 Stories pedidas: `$ARGUMENTS`
 
-> **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir` (a ferramenta Write já cria as pastas). Comandos compostos pedem aprovação e travam a etapa.
+> **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir` (a ferramenta Write já cria as pastas). Comandos compostos pedem aprovação e travam a etapa. Para mudar arquivo, use a ferramenta Edit ou Write, nunca `sed`, `awk` ou redirecionamento. Para apagar um arquivo, use `git rm <caminho>`: é o único comando de remoção liberado (`rm` e `Remove-Item` pedem aprovação).
 
 ## 0. Pré-checagem
 
@@ -113,7 +113,7 @@ Na spec da story, troque o conteúdo de `## Design` (o comentário e o `_Pendent
 `src/lib/mocks/<dominio>.ts` — <o que simulam>. O /esteira:dev troca por dados reais.
 ```
 
-Não mexa nas seções Produto e Técnica.
+Não mexa nas seções Produto e Técnica. No frontmatter da spec, troque `status: backlog` por `status: design` (acrescente a linha se ela não existir): é como o git registra que o protótipo foi aprovado quando o PR é mergeado.
 
 ## 5. Conferir a cobertura
 

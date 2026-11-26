@@ -1,0 +1,51 @@
+schema_version: "1.1"
+name: spec-timer
+description: Com o protótipo da story 10 aprovado (status design), /esteira:spec 10 escreve a seção Técnica com modelo de dados, regras, contratos e um plano de testes que cobre todo AC, e marca status spec.
+tags: [f3, spec]
+context:
+  scaffold_script: seed.sh
+execution:
+  max_turns: 30
+  allowed_tools: [Skill, Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion]
+  prompt: |
+    /esteira:spec 10
+
+    Não vou conseguir responder perguntas agora: siga com o seu desenho.
+graders:
+  - name: skill-disparou
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:esteira:)?spec"'
+  - name: status-spec
+    type: regex
+    target: { source: file, path: docs/specs/10-timer-iniciar-parar.md }
+    pattern: '^status: spec$'
+    flags: m
+  - name: tecnica-preenchida
+    type: regex
+    target: { source: file, path: docs/specs/10-timer-iniciar-parar.md }
+    pattern: '_Pendente\._'
+    match: not_contains
+  - name: plano-cobre-todos-os-acs
+    type: regex
+    target: { source: file, path: docs/specs/10-timer-iniciar-parar.md }
+    pattern: '### Plano de testes[\s\S]*AC-10\.1[\s\S]*AC-10\.2[\s\S]*AC-10\.3[\s\S]*AC-10\.4'
+  - name: sem-codigo-de-producao
+    type: regex
+    target: files
+    pattern: '^src/'
+    flags: m
+    match: not_contains
+  - name: qualidade-da-tecnica
+    type: llm
+    focus: { source: file, path: docs/specs/10-timer-iniciar-parar.md }
+    criteria: |
+      Avalie a seção "## Técnica" desta spec de um timer de horas.
+      PASS somente se TODOS forem verdade:
+      1. O modelo de dados tem tabelas para registros de tempo e projetos (ou referencia projetos de outra story), com tipos e regras (ex.: só um timer ativo; descartar < 1 minuto).
+      2. As regras de negócio ficam em funções de domínio que recebem o banco por parâmetro, cada uma ligada a um AC.
+      3. Há server actions para iniciar e parar o timer, com mensagens de erro em PT-BR.
+      4. A tabela "Troca dos mocks" cobre os mocks do protótipo.
+      5. O plano de testes tem uma linha por AC (AC-10.1 a AC-10.4), explicando como preparar o "Dado" pela UI ou com o relógio do Playwright (o AC-10.2 precisa de 45 minutos).
+      6. Dinheiro em centavos e datas em UTC, ou uma justificativa se não for.
+      FAIL caso contrário.

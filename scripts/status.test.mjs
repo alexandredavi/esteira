@@ -167,3 +167,30 @@ test("revisão F2: dois gates abertos na mesma story — o de spec prevalece em 
     assert.equal(s.stories[0].pr.number, 42);
   }
 });
+
+test("F3: specs aprovadas listadas do branch padrão com o status do frontmatter", () => {
+  const dir = repo({ files: ALL, gh: { issues: [], prs: [] } });
+  writeFileSync(join(dir, "docs/specs/10-timer.md"), "---\nissue: 10\nepic: 2\nslug: timer\nstatus: spec\n---\n# x\n");
+  execFileSync("git", ["commit", "-qam", "spec aprovada"], { cwd: dir });
+  writeFileSync(join(dir, "docs/specs/10-timer.md"), "---\nissue: 10\nslug: timer\nstatus: dev\n---\n");
+  const s = collect(dir);
+  assert.deepEqual(s.specs, [{ path: "docs/specs/10-timer.md", issue: 10, slug: "timer", status: "spec" }]);
+});
+
+test("F3: story em review sem teste de aceite no branch do PR → /esteira:testes; com teste → /esteira:review", () => {
+  const dir = repo({ files: ALL, gh: { issues: [story(12, ["ready-for-dev"])], prs: [{ number: 50, url: "u50", headRefName: "feat/12-timer", body: "Closes #12", files: [] }] } });
+  const g = (...a) => execFileSync("git", a, { cwd: dir, stdio: "ignore" });
+  g("switch", "-q", "-c", "feat/12-timer");
+  writeFileSync(join(dir, "README.md"), "# dev\n");
+  g("commit", "-qam", "dev sem teste");
+  let s = collect(dir);
+  assert.equal(s.stories[0].acceptanceTests, false);
+  assert.equal(s.next.command, "/esteira:testes 12");
+  mkdirSync(join(dir, "e2e"), { recursive: true });
+  writeFileSync(join(dir, "e2e/12-timer.spec.ts"), 'test("AC-12.1 — x", () => {});\n');
+  g("add", "-A");
+  g("commit", "-qm", "testes");
+  s = collect(dir);
+  assert.equal(s.stories[0].acceptanceTests, true);
+  assert.equal(s.next.command, "/esteira:review 50");
+});

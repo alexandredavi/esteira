@@ -2,6 +2,7 @@
 issue: {{number}}
 epic: {{epic_number}}
 slug: {{slug}}
+status: backlog
 ---
 
 # #{{number}} — {{title}}
@@ -36,6 +37,6 @@ _Pendente._
 
 ## Técnica
 
-<!-- Preenchido por /esteira:spec: modelo de dados, contratos, decisões, riscos técnicos. -->
+<!-- Preenchido por /esteira:spec: modelo de dados, contratos, regras, plano de testes, troca dos mocks, decisões. -->
 
 _Pendente._

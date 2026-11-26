@@ -56,6 +56,30 @@ function artifactState(cwd, ref, path) {
   return existsSync(join(cwd, path));
 }
 
+// Specs aprovadas (no branch padrão; sem git, no disco): issue, slug e status do frontmatter.
+// O status da spec diz até onde a story foi aprovada: backlog → design → spec → dev → done.
+export function readSpecFrontmatter(text) {
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? "";
+  const field = (k) => new RegExp(`^${k}:\\s*(.+)$`, "m").exec(fm)?.[1].trim() ?? null;
+  return { issue: field("issue") ? Number(field("issue")) : null, slug: field("slug"), status: field("status") ?? "backlog" };
+}
+
+function listSpecs(cwd, ref) {
+  let files = [];
+  const read = (p) => (ref ? run("git", ["show", `${ref}:${p}`], cwd) : readFileSync(join(cwd, p), "utf8"));
+  if (ref) files = (run("git", ["ls-tree", "--name-only", `${ref}:docs/specs`], cwd) ?? "").split("\n").filter((f) => f.endsWith(".md")).map((f) => `docs/specs/${f}`);
+  else if (existsSync(join(cwd, "docs/specs"))) files = readdirSync(join(cwd, "docs/specs")).filter((f) => f.endsWith(".md")).map((f) => `docs/specs/${f}`);
+  return files.map((path) => ({ path, ...readSpecFrontmatter(read(path) ?? "") })).sort((a, b) => (a.issue ?? 0) - (b.issue ?? 0));
+}
+
+// O branch do PR de dev já tem teste de aceite para a story (algum AC-<n>.x em e2e/)? null = não deu para saber.
+function hasAcceptanceTests(cwd, head, issue) {
+  const ref = run("git", ["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${head}`], cwd) !== null ? `origin/${head}`
+    : run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${head}`], cwd) !== null ? head : null;
+  if (!ref) return null;
+  return run("git", ["grep", "-q", "-E", `AC-${issue}\\.[0-9]+`, ref, "--", "e2e"], cwd) !== null;
+}
+
 // Branch de gate só local (sem PR): o artefato está nele mas ainda não no padrão.
 function pendingLocalBranch(cwd, ref, gateBranch, path) {
   if (!ref || !gateBranch) return null;
@@ -124,7 +148,7 @@ export function collect(cwd) {
   const prsByIssue = new Map();
   const gatesByIssue = new Map();
   for (const pr of prs) {
-    const ref = { number: pr.number, url: pr.url };
+    const ref = { number: pr.number, url: pr.url, head: pr.headRefName };
     const gate = parseGateMarker(pr.body);
     if (gate && GATE_REVIEW_STAGE[gate.stage]) {
       const stage = GATE_REVIEW_STAGE[gate.stage];
@@ -143,7 +167,8 @@ export function collect(cwd) {
       const stage = storyStage(s, prsByIssue, gatesByIssue);
       const gate = gatesByIssue.get(s.number);
       const pr = stage === "in-review" ? prsByIssue.get(s.number) : stage === gate?.stage ? { number: gate.number, url: gate.url } : null;
-      return { number: s.number, title: s.title, stage, pr };
+      const tested = stage === "in-review" && pr?.head ? hasAcceptanceTests(cwd, pr.head, s.number) : null;
+      return { number: s.number, title: s.title, stage, pr, ...(tested === null ? {} : { acceptanceTests: tested }) };
     })
     .sort((a, b) => a.number - b.number);
 
@@ -162,7 +187,7 @@ export function collect(cwd) {
 
   return {
     cwd, defaultBranch: def.name, comparedTo: def.ref, fetched: def.fetched,
-    github: gh.available ? "ok" : gh.reason, artifacts, summary, stories,
+    github: gh.available ? "ok" : gh.reason, artifacts, summary, stories, specs: listSpecs(cwd, def.ref),
     next: nextStep(artifacts, stories, gh.available, def.name),
   };
 }
@@ -191,6 +216,9 @@ export function nextStep(artifacts, stories, ghAvailable, defaultName = "main") 
 
   const first = (stage) => stories.find((s) => s.stage === stage);
   const review = first("in-review");
+  if (review && review.acceptanceTests === false) {
+    return { action: "run", command: `/esteira:testes ${review.number}`, reason: `O PR #${review.pr.number} da story #${review.number} ainda não tem testes de aceite (a rastreabilidade do CI falha)`, story: review.number, pr: review.pr };
+  }
   if (review) return { action: "run", command: `/esteira:review ${review.pr.number}`, reason: `PR #${review.pr.number} da story #${review.number} aguarda review`, story: review.number };
   const gated = first("spec-review") ?? first("design-review");
   if (gated) {

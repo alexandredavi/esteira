@@ -3,7 +3,7 @@
 // O merge desse PR é a aprovação humana da etapa.
 //
 // node gate.mjs --stage discovery --branch docs/discovery --title "docs(discovery): …" \
-//   --paths docs/product/discovery.md [--summary "texto"] [--stories 12,13] [--cwd repo] [--body-file corpo.md]
+//   --paths docs/product/discovery.md [--summary "texto"] [--stories 12,13] [--closes 12] [--allow-missing] [--cwd repo] [--body-file corpo.md]
 //
 // Corpo do PR: --summary + checklist de templates/gates/<stage>.md + marcador <!-- esteira:gate … -->.
 //
@@ -36,8 +36,10 @@ function readTree(cwd, rel) {
 }
 
 // Corpo do PR: resumo (da skill) + checklist da etapa (templates/gates/<etapa>.md) + marcador.
-export function buildBody({ cwd = ".", stage, stories = [], summary, bodyFile }) {
+export function buildBody({ cwd = ".", stage, stories = [], summary, bodyFile, closes = [] }) {
   const parts = [];
+  // "Closes #n" fecha a issue no merge e liga o PR à story (o status mostra a story em review).
+  if (closes.length) parts.push(closes.map((n) => `Closes #${n}`).join("\n"));
   if (bodyFile) parts.push(readFileSync(resolve(cwd, bodyFile), "utf8").trim());
   else {
     parts.push(`## Gate: ${stage}\n\nO merge deste PR é a aprovação humana desta etapa da esteira.`);
@@ -52,7 +54,8 @@ export function buildBody({ cwd = ".", stage, stories = [], summary, bodyFile })
 export function openGate(opts) {
   const cwd = resolve(opts.cwd ?? process.cwd());
   const { stage, branch, title } = opts;
-  const paths = list(opts.paths);
+  const allowMissing = Boolean(opts["allow-missing"]);
+  const paths = list(opts.paths).filter((p) => !allowMissing || existsSync(join(resolve(opts.cwd ?? process.cwd()), p)));
   const stories = list(opts.stories).map(Number);
   if (!stage || !branch || !title || paths.length === 0) {
     return { ok: false, error: "Obrigatórios: --stage, --branch, --title, --paths" };
@@ -116,7 +119,7 @@ export function openGate(opts) {
   const prs = existing.ok ? JSON.parse(existing.out || "[]") : [];
   if (prs.length) return { ...base, opened: true, existed: true, committed, baseBranch, url: prs[0].url };
 
-  const body = buildBody({ cwd, stage, stories, summary: opts.summary, bodyFile: opts["body-file"] });
+  const body = buildBody({ cwd, stage, stories, summary: opts.summary, bodyFile: opts["body-file"], closes: list(opts.closes).map(Number) });
   const bodyFile = join(mkdtempSync(join(tmpdir(), "esteira-pr-")), "body.md");
   writeFileSync(bodyFile, body);
   const pr = gh(cwd, "pr", "create", "--base", baseBranch, "--head", branch, "--title", title, "--body-file", bodyFile);

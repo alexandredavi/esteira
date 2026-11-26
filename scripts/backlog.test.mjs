@@ -65,7 +65,7 @@ test("Gherkin renderizado com cenário e indentação", () => {
 test("spec renderizada com IDs AC-<issue>.<n> e sem placeholders", () => {
   const s = { ...story("timer-start-stop", [ac("inicia"), ac("para")]), number: 12 };
   const md = renderSpec(s, { number: 3, title: "Registrar tempo" }, TEMPLATE);
-  assert.match(md, /^---\nissue: 12\nepic: 3\nslug: timer-start-stop\n---/);
+  assert.match(md, /^---\nissue: 12\nepic: 3\nslug: timer-start-stop\nstatus: backlog\n---/);
   assert.match(md, /#### AC-12\.1 — inicia/);
   assert.match(md, /#### AC-12\.2 — para/);
   assert.match(md, /\*\*Como\*\* freelancer, \*\*quero\*\* iniciar um timer/);

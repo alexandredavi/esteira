@@ -21,7 +21,7 @@ const SKIP = new Set(["node_modules", ".next", ".git"]);
 
 // No Windows, npx/npm são .cmd e precisam de shell; monta a linha com aspas em vez de passar a lista (DEP0190).
 const quote = (a) => (/^[\w@./:=*-]+$/.test(a) ? a : `"${a.replace(/"/g, '\\"')}"`);
-function sh(cmd, args, cwd) {
+export function sh(cmd, args, cwd) {
   const opts = { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 };
   const r = process.platform === "win32"
     ? spawnSync([cmd, ...args].map(quote).join(" "), { ...opts, shell: true })

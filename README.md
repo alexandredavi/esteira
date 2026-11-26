@@ -24,9 +24,9 @@ Os comandos ficam sob o namespace do plugin: `/esteira:status`, `/esteira:discov
 | `/esteira:backlog` | Épicos e stories com critérios em Gherkin, no GitHub Projects | Issues + `docs/specs/` |
 | `/esteira:design-system` | Identidade, tokens oklch claro/escuro, contraste WCAG verificado, vitrine `/design` | `globals.css` + `docs/design/` |
 | `/esteira:prototipo` | Telas navegáveis com o DS, PR com preview | Código + preview |
-| `/esteira:spec` | Design técnico, modelo de dados, contratos | `docs/specs/<issue>-<slug>.md` |
-| `/esteira:dev` | Implementação da story em branch + PR | PR `Closes #<issue>` |
-| `/esteira:testes` | Gherkin → Vitest + Playwright com rastreabilidade | `e2e/<issue>-<slug>.spec.ts` |
+| `/esteira:spec` | Seção Técnica: modelo de dados, regras, contratos, troca dos mocks, plano de testes por AC | `docs/specs/<issue>-<slug>.md` |
+| `/esteira:dev` | Implementa a Técnica: schema + migração, regras com testes de unidade, server actions, mocks → dados reais | PR `Closes #<issue>` |
+| `/esteira:testes` | Cada AC em Gherkin vira um teste Playwright com o ID no título; a rastreabilidade do CI exige todos | `e2e/<issue>-<slug>.spec.ts` |
 | `/esteira:review` | Review por IA (correção, DS, cobertura de ACs) + seu OK | Comentários no PR |
 | deploy | Preview por PR (Vercel + Neon), produção no merge | — |
 | `/esteira:release` | Changelog e versão via release-please | `CHANGELOG.md` |
