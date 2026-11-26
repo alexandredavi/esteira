@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collect, nextStep } from "./status.mjs";
+import { collect, nextStep, readSpecFrontmatter } from "./status.mjs";
 
 function repo({ files = [], gh = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "esteira-status-"));
@@ -193,4 +193,21 @@ test("F3: story em review sem teste de aceite no branch do PR → /esteira:teste
   s = collect(dir);
   assert.equal(s.stories[0].acceptanceTests, true);
   assert.equal(s.next.command, "/esteira:review 50");
+});
+
+test("revisão F3: frontmatter com BOM, aspas e comentário; status ausente = null", () => {
+  assert.equal(readSpecFrontmatter("﻿---\nissue: 3\nstatus: spec\n---\n").status, "spec");
+  assert.equal(readSpecFrontmatter('---\nstatus: "dev" # x\n---\n').status, "dev");
+  assert.equal(readSpecFrontmatter("---\nissue: 3\n---\n").status, null);
+});
+
+test("revisão F3: só título de test() com o AC conta como teste de aceite no branch do PR", () => {
+  const dir = repo({ files: ALL, gh: { issues: [story(12, ["ready-for-dev"])], prs: [{ number: 51, url: "u51", headRefName: "feat/12-x", body: "Closes #12", files: [] }] } });
+  const g = (...a) => execFileSync("git", a, { cwd: dir, stdio: "ignore" });
+  g("switch", "-q", "-c", "feat/12-x");
+  mkdirSync(join(dir, "e2e"), { recursive: true });
+  writeFileSync(join(dir, "e2e/12-x.spec.ts"), "// TODO: escrever o teste do AC-12.1\n");
+  g("add", "-A");
+  g("commit", "-qm", "só comentário");
+  assert.equal(collect(dir).stories[0].acceptanceTests, false);
 });

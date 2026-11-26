@@ -28,6 +28,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs .
   - `design` → protótipo aprovado: siga.
   - `backlog` → falta o protótipo. Diga para rodar `/esteira:prototipo <n>` e pare.
   - `spec`, `dev` ou `done` → esta etapa já passou. Diga isso e pare.
+  - `status` ausente (`null`, spec anterior à esteira F3) → use o estágio da story em `stories[]`: `design-approved` vale como `design`.
 - Se a story estiver em `spec-review` em `stories[]` → já há PR aberto. Para revisar: `node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs . --to docs/spec-<n>-<slug>`, ajuste e rode o passo 4 de novo.
 
 Leia com a ferramenta **Read**:
@@ -45,6 +46,7 @@ A arquitetura da esteira (não mude sem registrar em "Decisões"):
 - **Next.js 16 App Router** com Cache Components: leitura de dados em server components dentro de `<Suspense>`; escrita por **server actions** (`src/app/<rota>/actions.ts`).
 - **Banco:** Drizzle + Postgres. Em dev, testes e CI é o PGlite, em memória; em preview e produção é o Neon. O schema fica em `src/db/schema.ts` e as migrações são geradas por `npm run db:generate`.
 - **Regras de negócio** em funções puras de `src/lib/domain/<dominio>.ts` que **recebem o `db` por parâmetro**. É isso que permite testar cada regra com um banco em memória (Vitest).
+- **Sem transações**: em produção o banco é o Neon via HTTP, que não tem `db.transaction()` (o banco local também a bloqueia, para os testes pegarem). Operações que precisam ser atômicas viram **um único comando SQL** (ex.: CTE com `DELETE … RETURNING` seguido de `INSERT`). Descreva isso nas Regras de negócio.
 - **Valores em dinheiro** em centavos (inteiro). **Datas** em UTC no banco, exibidas em `America/Sao_Paulo`.
 - **Mensagens** de erro e validação em PT-BR, no tom do DS.
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ensure, patchNextConfig, upgradeCi } from "./ensure.mjs";
@@ -33,7 +33,7 @@ test("next.config recebe serverExternalPackages, sem duplicar e respeitando list
   assert.match(out, /const nextConfig: NextConfig = \{\n  serverExternalPackages: \["@electric-sql\/pglite"\],/);
   assert.equal(patchNextConfig(out), out);
   assert.match(patchNextConfig('const nextConfig = {\n  serverExternalPackages: ["sharp"],\n};'), /\["@electric-sql\/pglite", "sharp"\]/);
-  assert.throws(() => patchNextConfig("export default {}"), /Não reconheci/);
+  assert.throws(() => patchNextConfig("module.exports = require('./x');"), /Não reconheci/);
 });
 
 test("ci.yml: cria, atualiza o v1 da esteira, mantém o v2 e não toca em customizado", () => {
@@ -81,4 +81,24 @@ test("ensure é idempotente e não sobrescreve arquivo do produto", () => {
 test("camada desconhecida e repo sem app dão erro", () => {
   assert.equal(ensure("xyz", { cwd: app() }).ok, false);
   assert.match(ensure("db", { cwd: mkdtempSync(join(tmpdir(), "esteira-ensure-vazio-")) }).error, /setup/);
+});
+
+test("revisão F3: next.config com export default direto e .mjs são aceitos", () => {
+  assert.match(patchNextConfig("export default {\n  reactStrictMode: true,\n};\n"), /export default \{\n  serverExternalPackages: \["@electric-sql\/pglite"\],/);
+  const dir = app();
+  writeFileSync(join(dir, "next.config.mjs"), "export default {\n};\n");
+  rmSync(join(dir, "next.config.ts"));
+  const r = ensure("db", { cwd: dir, "skip-install": true });
+  assert.equal(r.ok, true, r.error);
+  assert.match(read(dir, "next.config.mjs"), /serverExternalPackages/);
+});
+
+test("revisão F3: next.config irreconhecível falha ANTES de escrever qualquer arquivo", () => {
+  const dir = app();
+  writeFileSync(join(dir, "next.config.ts"), "module.exports = require('./outra-config');\n");
+  const r = ensure("db", { cwd: dir, "skip-install": true });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /serverExternalPackages/);
+  assert.equal(existsSync(join(dir, "src/db/index.ts")), false);
+  assert.equal(JSON.parse(read(dir, "package.json")).scripts["db:generate"], undefined);
 });

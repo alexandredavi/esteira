@@ -165,3 +165,10 @@ test("F3: --allow-missing ignora caminhos inexistentes (PR de dev com caminhos o
   assert.equal(openGate({ cwd: dir, stage: "dev", branch: "feat/12-x", title: "t", paths: "drizzle" }).ok, false);
   assert.equal(openGate({ cwd: dir, stage: "dev", branch: "feat/12-x", title: "t", paths: "drizzle", "allow-missing": true }).ok, false, "precisa de pelo menos um caminho");
 });
+
+test("revisão F3: --closes e --stories só aceitam números", () => {
+  const { dir } = productRepo({ remote: false });
+  const path = writeArtifact(dir);
+  assert.match(openGate({ cwd: dir, stage: "dev", branch: "feat/1-x", title: "t", paths: path, closes: "abc" }).error, /só números/);
+  assert.match(openGate({ cwd: dir, stage: "spec", branch: "docs/x", title: "t", paths: path, stories: "12,x" }).error, /só números/);
+});

@@ -57,6 +57,10 @@ export function openGate(opts) {
   const allowMissing = Boolean(opts["allow-missing"]);
   const paths = list(opts.paths).filter((p) => !allowMissing || existsSync(join(resolve(opts.cwd ?? process.cwd()), p)));
   const stories = list(opts.stories).map(Number);
+  const closes = list(opts.closes);
+  if ([...stories, ...closes.map(Number)].some((n) => !Number.isInteger(n) || n <= 0)) {
+    return { ok: false, error: "--stories e --closes aceitam só números de issue (ex.: 12,13)." };
+  }
   if (!stage || !branch || !title || paths.length === 0) {
     return { ok: false, error: "Obrigatórios: --stage, --branch, --title, --paths" };
   }
@@ -119,7 +123,7 @@ export function openGate(opts) {
   const prs = existing.ok ? JSON.parse(existing.out || "[]") : [];
   if (prs.length) return { ...base, opened: true, existed: true, committed, baseBranch, url: prs[0].url };
 
-  const body = buildBody({ cwd, stage, stories, summary: opts.summary, bodyFile: opts["body-file"], closes: list(opts.closes).map(Number) });
+  const body = buildBody({ cwd, stage, stories, summary: opts.summary, bodyFile: opts["body-file"], closes: closes.map(Number) });
   const bodyFile = join(mkdtempSync(join(tmpdir(), "esteira-pr-")), "body.md");
   writeFileSync(bodyFile, body);
   const pr = gh(cwd, "pr", "create", "--base", baseBranch, "--head", branch, "--title", title, "--body-file", bodyFile);

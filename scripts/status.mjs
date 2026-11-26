@@ -59,9 +59,14 @@ function artifactState(cwd, ref, path) {
 // Specs aprovadas (no branch padrão; sem git, no disco): issue, slug e status do frontmatter.
 // O status da spec diz até onde a story foi aprovada: backlog → design → spec → dev → done.
 export function readSpecFrontmatter(text) {
-  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)?.[1] ?? "";
-  const field = (k) => new RegExp(`^${k}:\\s*(.+)$`, "m").exec(fm)?.[1].trim() ?? null;
-  return { issue: field("issue") ? Number(field("issue")) : null, slug: field("slug"), status: field("status") ?? "backlog" };
+  const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text.replace(/^\uFEFF/, ""))?.[1] ?? "";
+  const field = (k) => {
+    const raw = new RegExp(`^${k}:\\s*(.*)$`, "m").exec(fm)?.[1];
+    if (raw == null) return null;
+    return raw.replace(/\s+#.*$/, "").trim().replace(/^(["'])(.*)\1$/, "$2").trim() || null;
+  };
+  // status ausente (specs anteriores à F3) = null: quem lê usa o estágio da story pelas labels.
+  return { issue: field("issue") ? Number(field("issue")) : null, slug: field("slug"), status: field("status") };
 }
 
 function listSpecs(cwd, ref) {
@@ -77,7 +82,12 @@ function hasAcceptanceTests(cwd, head, issue) {
   const ref = run("git", ["rev-parse", "--verify", "--quiet", `refs/remotes/origin/${head}`], cwd) !== null ? `origin/${head}`
     : run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${head}`], cwd) !== null ? head : null;
   if (!ref) return null;
-  return run("git", ["grep", "-q", "-E", `AC-${issue}\\.[0-9]+`, ref, "--", "e2e"], cwd) !== null;
+  try {
+    execFileSync("git", ["grep", "-q", "-E", `\\btest(\\.only)?\\(\\s*["'\`]AC-${issue}\\.[0-9]+`, ref, "--", "e2e"], { cwd, stdio: "ignore" });
+    return true;
+  } catch (e) {
+    return e.status === 1 ? false : null; // 1 = nenhum teste com o AC; outro código = erro do git
+  }
 }
 
 // Branch de gate só local (sem PR): o artefato está nele mas ainda não no padrão.

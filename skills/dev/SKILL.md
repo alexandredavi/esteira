@@ -28,6 +28,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs .
   - `spec` → spec técnica aprovada: siga.
   - `backlog` ou `design` → falta etapa anterior. Diga qual (`/esteira:prototipo` ou `/esteira:spec`) e pare.
   - `dev` ou `done` → já implementada. Diga isso e pare.
+  - `status` ausente (`null`, spec anterior à esteira F3) → use o estágio da story em `stories[]`: `ready-for-dev` vale como `spec`.
 - Story em `in-review` em `stories[]` → o PR de dev já existe. Para continuar nele: `node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs . --to feat/<n>-<slug>`.
 
 Leia com a ferramenta **Read**: a spec inteira (Produto, Design e **Técnica**), `AGENTS.md`, o código do protótipo citado na seção Design, `src/db/schema.ts` e `src/lib/domain/` (o que já existe), e `docs/design/README.md`.
@@ -45,7 +46,7 @@ O `db` só é necessário se a Técnica tiver modelo de dados. O `tests` vale se
 
 ## 2. Implementar, nesta ordem
 
-1. **Schema**: as tabelas da Técnica em `src/db/schema.ts`. Depois rode `npm run db:generate`, que cria a migração em `drizzle/`.
+1. **Schema**: as tabelas da Técnica em `src/db/schema.ts`. Depois rode `npm run db:generate` (timeout de 120000 ms), que cria a migração em `drizzle/`. **Só acrescente** tabelas e colunas: renomear ou apagar coluna faz o `drizzle-kit` abrir uma pergunta interativa, que trava aqui. Se a Técnica exigir renomear, crie a coluna nova, migre os dados e deixe a remoção para outra story. Se o comando travar ou perguntar algo, pare e explique.
 2. **Regras de negócio** em `src/lib/domain/<dominio>.ts`: funções que recebem `db: Db` (de `@/db`) por parâmetro. **Testes de unidade** ao lado (`<dominio>.test.ts`, Vitest), com `criarDbDeTeste()` de `@/db/testing`: um banco novo por teste, cobrindo as regras e os erros.
 3. **Server actions** em `src/app/<rota>/actions.ts` (`"use server"`): chamam `getDb()` e a função de domínio, e devolvem erros em PT-BR para a UI mostrar. Use `revalidatePath` depois de escrever.
 4. **Troca dos mocks**: as telas do protótipo passam a ler e escrever dados reais, conforme a tabela "Troca dos mocks". Leitura em server component dentro de `<Suspense>` (chame `await connection()` de `next/server` antes de ler o banco). Os **estados reais** substituem o `?estado=`: lista vazia, o fallback do Suspense e `error.tsx`. Apague os mocks que ficaram sem uso.
@@ -55,6 +56,7 @@ Regras do código:
 
 - Só tokens do DS (a regra `esteira-ds/no-raw-styles` vale). Sem `eslint-disable`.
 - Sem `any`. Os tipos vêm do schema: `typeof tabela.$inferSelect`.
+- **Sem `db.transaction()`**: o Neon via HTTP não tem, e o banco local também a bloqueia. Operação atômica é um único comando SQL (CTE).
 - Não escreva os testes de aceite (`e2e/`): isso é do `/esteira:testes`.
 
 ## 3. Verificar

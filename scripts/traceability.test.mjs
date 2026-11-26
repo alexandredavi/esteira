@@ -8,7 +8,7 @@ import { parseSpec, parseTests, analyze, run } from "../templates/app/esteira/tr
 const spec = (issue, status, acs) => `---\nissue: ${issue}\nepic: 2\nslug: x\nstatus: ${status}\n---\n\n# #${issue}\n\n${acs.map((a) => `#### ${a} — título\n\n\`\`\`gherkin\nCenário: x\n\`\`\``).join("\n\n")}\n`;
 
 test("parseSpec lê issue, status e ACs (status ausente = backlog)", () => {
-  assert.deepEqual(parseSpec(spec(12, "dev", ["AC-12.1", "AC-12.2"])), { issue: 12, status: "dev", acs: ["AC-12.1", "AC-12.2"] });
+  assert.deepEqual(parseSpec(spec(12, "dev", ["AC-12.1", "AC-12.2"])), { issue: 12, status: "dev", invalidStatus: null, acs: ["AC-12.1", "AC-12.2"] });
   assert.equal(parseSpec("---\nissue: 3\n---\n").status, "backlog");
   assert.deepEqual(parseSpec("texto citando AC-9.1 fora de cabeçalho").acs, []);
 });
@@ -52,4 +52,47 @@ test("run lê docs/specs e e2e/ recursivo num repo", () => {
   const r = run(dir);
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.deepEqual(r.required, [{ spec: "docs/specs/10-timer.md", status: "dev", acs: 2, covered: 2 }]);
+});
+
+test("revisão F3: teste comentado não conta (// e /* */), string com // não vira comentário", () => {
+  const src = [
+    '// test("AC-12.1 — comentado", () => {});',
+    '/* test("AC-12.2 — bloco", () => {}); */',
+    'test("AC-12.3 — url http://x.y // não é comentário", () => {});',
+    'const t = `a ${"b"} c`; test(`AC-12.4 — template`, () => {});',
+  ].join("\n");
+  assert.deepEqual(parseTests(src), { counted: ["AC-12.3", "AC-12.4"], skipped: [] });
+});
+
+test("revisão F3: describe.skip/fixme e test.skip() no corpo não contam", () => {
+  const src = `
+    test.describe.skip("grupo", () => {
+      test("AC-12.1 — dentro do describe pulado", async () => {});
+    });
+    describe.fixme("outro", () => { test("AC-12.2 — fixme", () => {}); });
+    test("AC-12.3 — pula no corpo", async ({ browserName }) => {
+      test.skip(browserName === "webkit", "motivo");
+    });
+    test("AC-12.4 — pula sempre", async () => { test.fixme(); });
+    test("AC-12.5 — conta (parênteses no título)", async () => { expect(f("x)")).toBe(1); });
+    test.describe("normal", () => { test("AC-12.6 — conta", () => {}); });
+  `;
+  assert.deepEqual(parseTests(src), { counted: ["AC-12.5", "AC-12.6"], skipped: ["AC-12.1", "AC-12.2", "AC-12.3", "AC-12.4"] });
+});
+
+test("revisão F3: status com BOM, aspas e comentário; status inválido falha", () => {
+  assert.equal(parseSpec("﻿---\nissue: 1\nstatus: dev\n---\n").status, "dev");
+  assert.equal(parseSpec('---\nstatus: "dev"\n---\n').status, "dev");
+  assert.equal(parseSpec("---\nstatus: dev # em andamento\n---\n").status, "dev");
+  const s = parseSpec("---\nstatus: desenvolvimento\n---\n");
+  assert.equal(s.invalidStatus, "desenvolvimento");
+  const r = analyze([{ file: "x.md", ...s }], []);
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.invalid, [{ spec: "x.md", status: "desenvolvimento" }]);
+});
+
+test("revisão F3: spec em dev sem nenhum AC falha (0/0 não é cobertura)", () => {
+  const r = analyze([{ file: "y.md", status: "dev", acs: [] }], []);
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.empty, ["y.md"]);
 });

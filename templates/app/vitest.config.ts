@@ -6,6 +6,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // Story só de UI (sem regra de negócio) não tem teste de unidade: não é falha.
+    passWithNoTests: true,
     // PGlite sobe um Postgres por teste: dá folga no primeiro.
     testTimeout: 20_000,
   },

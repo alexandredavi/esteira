@@ -40,6 +40,7 @@ const FILES = {
     ["esteira/traceability.mjs", "scripts/esteira/traceability.mjs"],
   ],
 };
+const NEXT_CONFIGS = ["next.config.ts", "next.config.mjs", "next.config.js"];
 const RESET_ROUTE = ["api-e2e-reset/route.ts", "src/app/api/e2e/reset/route.ts"];
 
 const SCRIPTS = {
@@ -54,8 +55,8 @@ export function patchNextConfig(src) {
     if (src.includes("@electric-sql/pglite")) return src;
     return src.replace(/serverExternalPackages:\s*\[/, 'serverExternalPackages: ["@electric-sql/pglite", ');
   }
-  const m = /const nextConfig(?::\s*NextConfig)?\s*=\s*\{/.exec(src);
-  if (!m) throw new Error("Não reconheci o next.config.ts para adicionar serverExternalPackages.");
+  const m = /const nextConfig(?::\s*NextConfig)?\s*=\s*\{/.exec(src) ?? /export default\s*(?:\(\s*)?\{/.exec(src);
+  if (!m) throw new Error("Não reconheci o next.config para adicionar serverExternalPackages.");
   const at = m.index + m[0].length;
   return src.slice(0, at) + '\n  serverExternalPackages: ["@electric-sql/pglite"],' + src.slice(at);
 }
@@ -80,6 +81,17 @@ export function ensure(feature, opts = {}) {
 
   const changed = [];
   const notes = [];
+
+  // Valida o que pode falhar ANTES de escrever qualquer coisa (nada de repo pela metade).
+  let nextConfigPatch = null;
+  if (feature === "db") {
+    const ncName = NEXT_CONFIGS.find((n) => existsSync(join(cwd, n)));
+    if (ncName) {
+      const before = readFileSync(join(cwd, ncName), "utf8");
+      try { nextConfigPatch = { name: ncName, before, after: patchNextConfig(before) }; }
+      catch (err) { return { ok: false, error: `${err.message} Adicione serverExternalPackages: ["@electric-sql/pglite"] em ${ncName} e rode de novo.` }; }
+    } else notes.push('next.config não encontrado: adicione serverExternalPackages: ["@electric-sql/pglite"] à mão.');
+  }
   const write = (rel, content) => {
     const abs = join(cwd, rel);
     mkdirSync(dirname(abs), { recursive: true });
@@ -97,14 +109,7 @@ export function ensure(feature, opts = {}) {
   for (const [k, v] of Object.entries(SCRIPTS[feature])) if (!scripts[k]) scripts[k] = v;
   if (JSON.stringify(scripts) !== JSON.stringify(pkg.scripts)) { pkg.scripts = scripts; write("package.json", JSON.stringify(pkg, null, 2) + "\n"); }
 
-  if (feature === "db") {
-    const nc = join(cwd, "next.config.ts");
-    if (existsSync(nc)) {
-      const before = readFileSync(nc, "utf8");
-      const after = patchNextConfig(before);
-      if (after !== before) write("next.config.ts", after);
-    } else notes.push("next.config.ts não encontrado: adicione serverExternalPackages: [\"@electric-sql/pglite\"] à mão.");
-  }
+  if (nextConfigPatch && nextConfigPatch.after !== nextConfigPatch.before) write(nextConfigPatch.name, nextConfigPatch.after);
 
   if (feature === "tests") {
     const ciPath = join(cwd, ".github/workflows/ci.yml");
