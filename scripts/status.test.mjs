@@ -32,7 +32,8 @@ function repo({ files = [], gh = null } = {}) {
 
 const story = (number, labels = [], state = "OPEN") => ({ number, title: `Story ${number}`, state, labels: ["type:story", ...labels].map((name) => ({ name })) });
 const PRODUCT = ["docs/product/discovery.md", "docs/product/prd.md"];
-const ALL = [...PRODUCT, "docs/design/README.md"];
+const BACKLOG = [...PRODUCT, "docs/specs/10-timer.md"];
+const ALL = [...BACKLOG, "docs/design/README.md"];
 
 test("repo vazio sugere /discovery", () => {
   const s = collect(repo({ gh: { issues: [], prs: [] } }));
@@ -64,8 +65,22 @@ test("sem GitHub, depois do PRD pede setup", () => {
   assert.equal(s.action, "setup");
 });
 
-test("stories sem design system → /design-system", () => {
+test("issues criadas mas specs em PR aberto → mergear o PR do backlog", () => {
+  const gh = { issues: [story(10)], prs: [{ number: 4, url: "u", headRefName: "docs/backlog", body: "", files: [{ path: "docs/specs/10-timer.md" }] }] };
+  const s = collect(repo({ files: PRODUCT, gh }));
+  assert.equal(s.next.action, "merge");
+  assert.equal(s.next.command, "/esteira:backlog");
+  assert.equal(s.next.pr.number, 4);
+});
+
+test("issues criadas sem specs nem PR → rodar /backlog de novo", () => {
   const s = collect(repo({ files: PRODUCT, gh: { issues: [story(10)], prs: [] } }));
+  assert.equal(s.next.command, "/esteira:backlog");
+  assert.equal(s.next.action, "run");
+});
+
+test("stories sem design system → /design-system", () => {
+  const s = collect(repo({ files: BACKLOG, gh: { issues: [story(10)], prs: [] } }));
   assert.equal(s.next.command, "/esteira:design-system");
 });
 

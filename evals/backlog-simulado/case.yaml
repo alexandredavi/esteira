@@ -1,0 +1,46 @@
+schema_version: "1.1"
+name: backlog-simulado
+description: Com discovery e PRD aprovados e sem GitHub, /esteira:backlog gera o plano, roda em modo simulado e escreve specs com critérios Gherkin e IDs AC.
+tags: [f1, backlog]
+context:
+  scaffold_script: seed.sh
+execution:
+  max_turns: 30
+  allowed_tools: [Skill, Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion]
+  prompt: |
+    /esteira:backlog
+
+    Não vou conseguir responder perguntas agora: siga com as suas recomendações.
+graders:
+  - name: skill-disparou
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:esteira:)?backlog"'
+  - name: plano-escrito
+    type: file_exists
+    path: .esteira/backlog.plan.json
+  - name: specs-geradas
+    type: regex
+    target: files
+    pattern: 'docs/specs/\d+-[a-z0-9-]+\.md'
+  - name: script-publicou-em-dry-run
+    type: regex
+    target: trace
+    pattern: 'backlog\.mjs[^\n]*--dry-run'
+  - name: um-epico-por-cap
+    type: regex
+    target: { source: file, path: .esteira/backlog.plan.json }
+    pattern: '"cap"\s*:\s*"CAP-\d+"'
+    match: count:2
+  - name: qualidade-do-plano
+    type: llm
+    focus: { source: file, path: .esteira/backlog.plan.json }
+    criteria: |
+      Este é o plano de backlog de um time tracker (CAP-1 registrar tempo, CAP-2 relatório por cliente).
+      PASS somente se TODOS forem verdade:
+      1. Há um épico por capacidade, na ordem CAP-1, CAP-2.
+      2. As stories são fatias verticais pequenas com títulos do ponto de vista do usuário.
+      3. Cada critério de aceite usa apenas passos Dado/Quando/Então/E/Mas e descreve comportamento observável, sem detalhes de implementação (banco, API, status HTTP).
+      4. Há pelo menos um critério de erro ou estado vazio em todo o plano.
+      5. A primeira story é o menor caminho útil (por exemplo, iniciar e parar o timer).
+      FAIL caso contrário.

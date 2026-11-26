@@ -1,0 +1,41 @@
+schema_version: "1.1"
+name: prd-a-partir-do-discovery
+description: Com um discovery aprovado no workspace, /esteira:prd escreve um PRD com capacidades CAP-n e fora de escopo explícito.
+tags: [f1, prd]
+context:
+  scaffold_script: seed.sh
+execution:
+  max_turns: 25
+  allowed_tools: [Skill, Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion]
+  prompt: |
+    /esteira:prd
+
+    Não vou conseguir responder perguntas agora: siga com as suas recomendações e registre o que presumir.
+graders:
+  - name: skill-disparou
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:esteira:)?prd"'
+  - name: arquivo-criado
+    type: file_exists
+    path: docs/product/prd.md
+  - name: sem-placeholders
+    type: regex
+    target: { source: file, path: docs/product/prd.md }
+    pattern: '\{\{|<!--'
+    match: not_contains
+  - name: capacidades
+    type: regex
+    target: { source: file, path: docs/product/prd.md }
+    pattern: '### CAP-1 — .+[\s\S]*### CAP-2 — '
+  - name: qualidade
+    type: llm
+    focus: { source: file, path: docs/product/prd.md }
+    criteria: |
+      PASS somente se TODOS forem verdade:
+      1. As capacidades CAP-n descrevem o que a pessoa consegue fazer, sem citar telas, frameworks ou banco de dados.
+      2. Cada CAP aponta para um job to be done.
+      3. Há uma seção "Fora de escopo" com itens e motivos (por exemplo, times/equipes ou faturamento ficando para depois).
+      4. Há pelo menos uma métrica de sucesso mensurável com forma de medir.
+      5. O nome do produto usado é o mesmo do discovery (Ponteiro).
+      FAIL caso contrário.

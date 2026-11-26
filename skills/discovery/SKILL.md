@@ -1,0 +1,87 @@
+---
+name: discovery
+description: Primeira etapa da esteira. Transforma uma ideia bruta de produto em docs/product/discovery.md (problema, personas, jobs to be done, concorrentes com fonte, proposta de valor, nome, premissas) e abre o PR de gate. Use quando a pessoa disser "/esteira:discovery", "tenho uma ideia de produto", "vamos fazer o discovery", ou quando o /esteira:status indicar esta etapa.
+argument-hint: "<ideia do produto em uma ou duas frases>"
+allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Read Write Edit Glob Grep WebSearch WebFetch AskUserQuestion Agent
+---
+
+# /esteira:discovery
+
+Você conduz o discovery de um produto novo. O resultado é **um arquivo** (`docs/product/discovery.md`) aprovado por **um PR**. Responda sempre em PT-BR.
+
+Ideia recebida: `$ARGUMENTS`
+
+## 0. Pré-checagem
+
+Rode com a ferramenta **Bash**:
+
+```
+node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs .
+```
+
+- `artifacts.discovery.merged` é `true` → o discovery já está aprovado. Diga isso, mostre o `next` e **pare**.
+- `artifacts.discovery.pendingPr` existe → já há um PR aguardando merge. Mostre o link e pergunte se a pessoa quer **revisar o arquivo existente**. Se sim, edite o arquivo e rode o passo 5 de novo, que atualiza o mesmo PR. Se não, pare.
+- Se `$ARGUMENTS` estiver vazio, peça a ideia em uma ou duas frases e espere.
+
+## 1. Entrevista (uma rodada)
+
+Faça **uma única rodada** de até 5 perguntas, cada uma com a sua recomendação, para que "sim" aceite a recomendação. Use AskUserQuestion quando disponível. Pergunte só o que a ideia não responde:
+
+1. **Persona principal**: quem sente a dor com mais intensidade?
+2. **Situação**: em que momento a dor aparece? O que dispara o problema?
+3. **Como resolve hoje**: ferramenta, gambiarra ou nada?
+4. **Ambição**: nicho específico ou categoria ampla? Mercado BR, global?
+5. **Restrições** conhecidas: idioma, dispositivo, regulação, orçamento.
+
+**Sem como perguntar** (modo não interativo, ou a ferramenta falhou): **não pare**. Siga com as respostas recomendadas e registre cada uma como premissa na seção 8 do arquivo, com um jeito de validar.
+
+## 2. Concorrentes e alternativas
+
+Delegue ao subagente **`esteira:pm`** (ferramenta Agent), passando a ideia, a persona principal e o problema em uma frase. Ele devolve a tabela com fontes.
+
+Se o subagente não estiver disponível, faça você mesmo, seguindo as mesmas regras: inclua uma alternativa não-software, nunca invente URL e marque com `conhecimento do modelo — validar` o que não confirmou.
+
+## 3. Nome
+
+Proponha **5 nomes próprios** curtos (de preferência até 2 sílabas e fáceis de falar em PT-BR), com "por que sim" e "por que não" para cada um. Evite marcas existentes da categoria e nomes descritivos genéricos.
+
+- Interativo: a pessoa escolhe (AskUserQuestion, com a sua recomendação primeiro).
+- Não interativo: escolha o melhor e registre como premissa.
+
+## 4. Escrever o artefato
+
+Leia o template `${CLAUDE_PLUGIN_ROOT}/templates/discovery.md` com a ferramenta **Read** (não use `cat`: o plugin fica fora do diretório de trabalho). Escreva `docs/product/discovery.md` no repo do produto, criando as pastas se preciso:
+
+- Preencha **todas** as seções. Troque os `{{…}}` e **remova os comentários `<!-- -->`**.
+- Ideia original: só a ideia de produto, literal. Deixe de fora instruções sobre a sessão (ex.: "não vou conseguir responder perguntas").
+- Problema: sem falar de solução.
+- Jobs to be done no formato "Quando…, quero…, para…".
+- Proposta de valor no formato do template.
+- Tudo o que foi presumido vai em "Premissas e hipóteses".
+
+Conteúdo enxuto: o arquivo inteiro deve caber em ~2 telas.
+
+## 5. Abrir o gate
+
+Rode com a ferramenta **Bash**, com um resumo de 2 a 4 frases **sem aspas duplas, crases nem `$`**:
+
+```
+node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs --stage discovery --branch docs/discovery --title "docs(discovery): <Nome> — discovery do produto" --paths docs/product/discovery.md --summary "<resumo>"
+```
+
+O script cria o branch, faz commit, push e abre o PR com o checklist do revisor. Ele devolve JSON:
+
+- `opened: true` → mostre o link do PR.
+- `opened: false` → mostre o `reason`. O arquivo foi salvo e o PR fica para quando o repo estiver no GitHub.
+- `ok: false` → mostre o `error` e pare.
+
+## 6. Fechar
+
+Responda curto:
+
+- **Nome escolhido** e a **proposta de valor** (uma frase)
+- Personas (uma linha cada)
+- Quantas premissas ficaram para validar
+- Link do PR e: "**Revise e mergeie o PR. O merge é o gate.** Depois, rode `/esteira:prd`."
+
+Não rode a próxima etapa.

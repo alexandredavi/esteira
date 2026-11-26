@@ -338,7 +338,8 @@ Formato de cada episódio: **uso da etapa + 2–4 min de anatomia** da skill (pr
 Não decididos na sessão de design; resolver durante F0–F6 e registrar no building-log:
 
 - Granularidade do protótipo: por épico (cobrindo várias stories) ou por story.
-- Onde o `/esteira:discovery` busca concorrentes (web search vs. input manual) e como cita fontes.
+- ~~Onde o discovery busca concorrentes~~ → **resolvido na F1**: o subagente `esteira:pm` usa WebSearch/WebFetch; sem web, marca a fonte como "conhecimento do modelo — validar" e nunca inventa URL.
+- Issues órfãs se o PR do backlog for fechado sem merge (as issues são criadas antes do PR, porque os números entram nos IDs dos ACs).
 - Formato exato do check de rastreabilidade (script Node no CI vs. ação reutilizável publicada no repo `esteira`).
 - Estratégia de rollback no deploy (Vercel instant rollback + migrations reversíveis).
 - Seeds de dados para previews e para os testes E2E.
