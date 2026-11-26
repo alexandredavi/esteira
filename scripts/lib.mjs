@@ -21,7 +21,13 @@ export function gh(cwd, ...args) {
   appendFileSync(log, JSON.stringify(args) + "\n");
   const [a, b] = args;
   if (a === "--version" || (a === "repo" && b === "view")) return { ok: true, out: '{"nameWithOwner":"fake/produto"}' };
-  if (a === "pr" && b === "list") return { ok: true, out: "[]" };
+  if (a === "pr" && b === "list") return { ok: true, out: process.env.ESTEIRA_FAKE_GH_PRS ?? "[]" };
+  if (a === "api") {
+    // ESTEIRA_FAKE_GH_API: JSON { "<caminho da api>": resposta }
+    const routes = JSON.parse(process.env.ESTEIRA_FAKE_GH_API ?? "{}");
+    const path = args.find((x, i) => i > 0 && !x.startsWith("-")) ?? "";
+    return path in routes ? { ok: true, out: JSON.stringify(routes[path]) } : { ok: false, out: "", err: `HTTP 404: ${path}` };
+  }
   if (a === "pr" && b === "create") return { ok: true, out: "https://github.com/fake/produto/pull/1" };
   if (a === "issue" && b === "list") return { ok: true, out: process.env.ESTEIRA_FAKE_GH_ISSUES ?? "[]" };
   if (a === "issue" && b === "create") return { ok: true, out: `https://github.com/fake/produto/issues/${++fakeCounter}` };

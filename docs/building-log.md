@@ -195,3 +195,34 @@ Conferi as telas no navegador: o timer conta de verdade, e a vitrine mostra os d
 | 10 | Baixa | `hasAcceptanceTests` contava comentário; `next.config` em `export default`/`.mjs` não era aceito, e a falha deixava o repo pela metade; `--closes abc` virava `#NaN` | Só título de `test()`; mais formatos e validação **antes** de escrever; números validados |
 
 **Bug meu durante as correções:** editei o `status.mjs` com `String.replace(from, to)`, e o texto novo tinha `` $` ``, que no JavaScript significa "tudo o que vem antes do trecho". O arquivo inteiro foi colado no meio de uma função. Restaurei do git e passei a usar `replace(from, () => to)` em todas as edições por script.
+
+## 2026-11-26 — F4 — Review independente, deploy e release
+
+**O que fiz:**
+- **`/esteira:review` + agente `esteira:reviewer`**: o processo que eu mesmo usei a cada fase virou etapa da esteira. A skill roda as checagens determinísticas (rastreabilidade, lint, tipos, unidade e CI do PR). Depois entrega ao revisor **só** a story, a spec e o comando do diff, sem opinião nem resumo, e publica o resultado como comentário de review. O autor do PR não pode aprovar o próprio PR no GitHub, então o merge fica com a pessoa: é o gate.
+- **`/esteira:deploy`**: o build da Vercel vira `node scripts/esteira/migrate.mjs && next build`. A migração só roda com `DATABASE_URL` **e** `ESTEIRA_MIGRATE=1`, ligado à mão por ambiente, para que um preview sem branch próprio do Neon nunca migre o banco de produção. Falha de migração derruba o build, e a versão anterior continua no ar. O `docs/deploy.md` cobre configuração, rollback (instant rollback da Vercel; sem rollback de banco, porque as migrações são só aditivas) e diagnóstico. O `deploy-status.mjs` lê produção e previews pela API de deployments do GitHub.
+- **`/esteira:release`**: release-please v5 com o changelog em PT-BR, a partir dos títulos dos PRs, que já são Conventional Commits. O merge do Release PR é o gate da versão.
+
+**Teste:**
+- Deploy e release instalados num app real; o build no Windows passou com a migração encadeada.
+- A trava se confirmou nos três casos: sem banco, pula; sem `ESTEIRA_MIGRATE`, recusa; com os dois e o banco fora do ar, **falha o build**.
+- O `deploy-status.mjs` rodou contra o GitHub real (repo sem Vercel e os avisos certos).
+- **Não testado:** Neon e Vercel de verdade, porque exigem contas. Fica para o dry-run da F6.
+
+**O `/esteira:review` local na story #10** (259 s, US$ 1,07) achou dois problemas reais:
+1. **Bloqueia:** o código **commitado** no branch ainda tinha a rota de reset antiga, que zeraria o Neon. As correções da revisão da F3 estavam só no working tree do repo de teste. O revisor notou essa diferença sozinho.
+2. **Importante:** valor/hora digitado como `1.200` era gravado como **R$ 1,20**, e não R$ 1.200,00. Um bug de negócio que passou por spec, dev, 26 testes de unidade e 4 de aceite. É a melhor demonstração do porquê de uma revisão independente depois dos testes.
+
+**Desvio do design (para decidir):** o Q23 previa Playwright **contra o preview da Vercel**. A F3 colocou os testes de aceite no CI com o app local e banco em memória, porque eles precisam zerar o banco antes de cada teste, e o reset é proibido em banco remoto por segurança. O preview fica para a revisão humana.
+
+**Revisão independente da F4:** achou 7 problemas, todos corrigidos.
+
+| # | Gravidade | Bug | Correção |
+|---|---|---|---|
+| 1 | Alta | O migrador HTTP do Neon roda cada comando **sem transação** e registra no fim. Uma migração que falhasse no meio deixaria o banco pela metade, e **todo build seguinte quebraria** com "already exists". Dois builds simultâneos disputariam a mesma migração | Driver `neon-serverless` (WebSocket), cujo migrador aplica tudo numa transação (conferido no código-fonte do Drizzle), mais um `pg_advisory_lock` para que builds paralelos migrem um de cada vez |
+| 2 | Média | `docs:` aparecia no changelog, e todo merge de spec ou discovery geraria versão nova. Protótipo e DS (`feat`) virariam "Novidades" | `docs` oculto; gates de protótipo e DS passam a ser `chore(...)`; só story implementada (`feat(#n)`) e `fix` sobem versão |
+| 3 | Média | Depois de um Instant Rollback, a Vercel **para de promover** a `main` sozinha, e a correção mergeada não iria para o ar. O status chamava de "produção" o último deploy | Runbook e skill explicam o Undo Rollback; o status diz "último deploy de produção" |
+| 4 | Média | "Só aditiva" não basta: coluna nova `NOT NULL` sem default quebra o código antigo num rollback e falha a migração numa tabela com dados | Regra no dev, no revisor e no runbook: coluna nova é nullable ou tem DEFAULT |
+| 5 | Média | Com merge commit (o padrão do GitHub), os commits dos gates entram na `main` e o changelog repete entradas da mesma story | `release-check.mjs` confere squash-only com o título do PR, e as permissões do workflow, e diz como corrigir sem mudar nada sozinho |
+| 6 | Média | O `gh api repos/{owner}/...` quebra no PowerShell 5.1 (`{owner}` vira script block), e `git tag *` liberava apagar tags | A checagem foi para um script Node; o `git tag` ficou só leitura |
+| 7 | Baixa | O status lia só os 50 deploys mais recentes; produção ou o preview de um PR antigo sumiam | Consultas filtradas por ambiente e por branch |

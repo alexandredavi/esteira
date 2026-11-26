@@ -3,6 +3,8 @@
 //
 // node ensure.mjs db     → Drizzle + PGlite (local/testes) + Neon (produção), src/db/, drizzle.config.ts
 // node ensure.mjs tests  → Vitest + Playwright, e2e/support.ts, rastreabilidade, CI v2
+// node ensure.mjs deploy → migração no build da Vercel (scripts/esteira/migrate.mjs) + docs/deploy.md
+// node ensure.mjs release → release-please (workflow, config e manifest com a versão do package.json)
 //   [--cwd repo] [--skip-install]
 //
 // Nunca sobrescreve arquivo existente (exceto o ci.yml, e só se ainda for o template original da esteira).
@@ -23,6 +25,8 @@ export const PACKAGES = {
   },
   // @types/node ^24: o template do Next traz ^20, e o Vitest 5 exige >= 22.
   tests: { deps: [], dev: ["vitest@5.1.2", "@playwright/test@1.65.1", "@types/node@^24"] },
+  deploy: { deps: [], dev: [] },
+  release: { deps: [], dev: [] },
 };
 
 const FILES = {
@@ -39,6 +43,14 @@ const FILES = {
     ["e2e/support.ts", "e2e/support.ts"],
     ["esteira/traceability.mjs", "scripts/esteira/traceability.mjs"],
   ],
+  deploy: [
+    ["esteira/migrate.mjs", "scripts/esteira/migrate.mjs"],
+    ["../deploy.md", "docs/deploy.md"],
+  ],
+  release: [
+    ["workflows/release-please.yml", ".github/workflows/release-please.yml"],
+    ["release-please-config.json", "release-please-config.json"],
+  ],
 };
 const NEXT_CONFIGS = ["next.config.ts", "next.config.mjs", "next.config.js"];
 const RESET_ROUTE = ["api-e2e-reset/route.ts", "src/app/api/e2e/reset/route.ts"];
@@ -46,9 +58,19 @@ const RESET_ROUTE = ["api-e2e-reset/route.ts", "src/app/api/e2e/reset/route.ts"]
 const SCRIPTS = {
   db: { "db:generate": "drizzle-kit generate" },
   tests: { test: "vitest run", "test:e2e": "playwright test", trace: "node scripts/esteira/traceability.mjs" },
+  deploy: {},
+  release: {},
 };
 
-const GITIGNORE = { db: [".esteira/"], tests: ["test-results/", "playwright-report/", "blob-report/"] };
+const GITIGNORE = { db: [".esteira/"], tests: ["test-results/", "playwright-report/", "blob-report/"], deploy: [], release: [] };
+
+const MIGRATE = "node scripts/esteira/migrate.mjs";
+/** O build passa a migrar antes do next build (a migração só roda na Vercel com ESTEIRA_MIGRATE=1). */
+export function withMigrateBuild(build) {
+  if (!build) return `${MIGRATE} && next build`;
+  if (build.includes(MIGRATE)) return build;
+  return `${MIGRATE} && ${build}`;
+}
 
 export function patchNextConfig(src) {
   if (src.includes("serverExternalPackages")) {
@@ -75,7 +97,7 @@ export function upgradeCi(current) {
 
 export function ensure(feature, opts = {}) {
   const cwd = resolve(opts.cwd ?? process.cwd());
-  if (!FILES[feature]) return { ok: false, error: `Camada desconhecida: ${feature}. Use db ou tests.` };
+  if (!FILES[feature]) return { ok: false, error: `Camada desconhecida: ${feature}. Use db, tests, deploy ou release.` };
   const pkgPath = join(cwd, "package.json");
   if (!existsSync(pkgPath)) return { ok: false, error: "Sem package.json: rode /esteira:setup antes." };
 
@@ -107,7 +129,13 @@ export function ensure(feature, opts = {}) {
   const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
   const scripts = { ...pkg.scripts };
   for (const [k, v] of Object.entries(SCRIPTS[feature])) if (!scripts[k]) scripts[k] = v;
+  if (feature === "deploy") scripts.build = withMigrateBuild(scripts.build);
   if (JSON.stringify(scripts) !== JSON.stringify(pkg.scripts)) { pkg.scripts = scripts; write("package.json", JSON.stringify(pkg, null, 2) + "\n"); }
+
+  if (feature === "release" && !existsSync(join(cwd, ".release-please-manifest.json"))) {
+    // A versão atual do app é o ponto de partida do release-please.
+    write(".release-please-manifest.json", JSON.stringify({ ".": pkg.version ?? "0.1.0" }, null, 2) + "\n");
+  }
 
   if (nextConfigPatch && nextConfigPatch.after !== nextConfigPatch.before) write(nextConfigPatch.name, nextConfigPatch.after);
 
