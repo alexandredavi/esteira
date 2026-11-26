@@ -1,0 +1,58 @@
+schema_version: "1.1"
+name: prototipo-timer
+description: Com DS aprovado e a spec da story 10 no repo, /esteira:prototipo 10 cria telas com mocks e estados, usa só tokens do DS e mapeia todo AC na seção Design da spec.
+tags: [f2, prototipo]
+context:
+  scaffold_script: seed.sh
+execution:
+  max_turns: 45
+  allowed_tools: [Skill, Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion]
+  prompt: |
+    /esteira:prototipo 10
+
+    Não vou conseguir responder perguntas agora: siga com o seu plano.
+graders:
+  - name: skill-disparou
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:esteira:)?prototipo"'
+  - name: rota-criada
+    type: regex
+    target: files
+    pattern: 'src/app/.*page\.tsx'
+  - name: mocks-criados
+    type: regex
+    target: files
+    pattern: 'src/lib/mocks/[\w-]+\.ts'
+  - name: sem-estilos-crus
+    type: regex
+    target: trace
+    pattern: '\b(bg|text|border)-(slate|gray|zinc|neutral|red|blue|green|emerald|amber)-\d{2,3}\b|\b(bg|text)-(white|black)\b'
+    match: not_contains
+  - name: design-preenchido-tecnica-pendente
+    type: regex
+    target: { source: file, path: docs/specs/10-timer-iniciar-parar.md }
+    pattern: '_Pendente\._'
+    match: count:1
+  - name: todos-os-acs-mapeados
+    type: regex
+    target: { source: file, path: docs/specs/10-timer-iniciar-parar.md }
+    pattern: '\|\s*AC-10\.[1-4]\s*\|'
+    match: count:4
+  - name: estados-por-url
+    type: regex
+    target: { source: file, path: docs/specs/10-timer-iniciar-parar.md }
+    pattern: '\?estado=vazio'
+  - name: qualidade-da-secao-design
+    type: llm
+    focus: { source: file, path: docs/specs/10-timer-iniciar-parar.md }
+    criteria: |
+      Avalie só a seção "## Design" desta spec.
+      PASS somente se TODOS forem verdade:
+      1. Lista as rotas criadas.
+      2. Tem uma tabela que mapeia cada um dos 4 critérios (AC-10.1 a AC-10.4) para onde e como vê-lo no protótipo.
+      3. Lista os estados (vazio, carregando, erro) com a URL de cada um.
+      4. Diz quais componentes do DS foram usados e se algum componente novo foi criado (com motivo).
+      5. Diz que os dados são mock e onde estão.
+      As seções "Produto" e "Técnica" não foram alteradas (Técnica continua "_Pendente._").
+      FAIL caso contrário.

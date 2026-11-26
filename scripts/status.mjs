@@ -9,13 +9,18 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { parseGateMarker } from "./gate.mjs";
+
+// Etapa do PR de gate aberto → estágio da story enquanto o PR não é mergeado.
+const GATE_REVIEW_STAGE = { prototipo: "design-review", spec: "spec-review" };
 
 // path: o que precisa existir no branch padrão; prPrefix: arquivos que um PR de gate dessa etapa toca.
 const ARTIFACTS = {
+  app: { path: "package.json", prPrefix: "package.json", gateBranch: "chore/setup" },
   discovery: { path: "docs/product/discovery.md", prPrefix: "docs/product/discovery.md", gateBranch: "docs/discovery" },
   prd: { path: "docs/product/prd.md", prPrefix: "docs/product/prd.md", gateBranch: "docs/prd" },
   backlog: { path: "docs/specs", prPrefix: "docs/specs/", gateBranch: "docs/backlog" },
-  designSystem: { path: "docs/design/README.md", prPrefix: "docs/design/", gateBranch: null },
+  designSystem: { path: "docs/design/README.md", prPrefix: "docs/design/", gateBranch: "design/system" },
 };
 
 function run(cmd, args, cwd) {
@@ -77,10 +82,15 @@ function loadGh(cwd) {
 const labelNames = (item) => (item.labels ?? []).map((l) => (typeof l === "string" ? l : l.name));
 const has = (item, label) => labelNames(item).includes(label);
 
-function storyStage(story, prsByIssue) {
+// backlog → design-review → design-approved → spec-review → ready-for-dev → in-review → done
+function storyStage(story, prsByIssue, gatesByIssue = new Map()) {
   if (story.state === "CLOSED") return "done";
   if (prsByIssue.has(story.number)) return "in-review";
+  // Um PR de gate aberto (inclusive revisão de algo já aprovado) vence a label: o próximo passo é o merge dele.
+  const gate = gatesByIssue.get(story.number);
+  if (gate?.stage === "spec-review") return "spec-review";
   if (has(story, "ready-for-dev") || has(story, "spec:approved")) return "ready-for-dev";
+  if (gate?.stage === "design-review") return "design-review";
   if (has(story, "design:approved")) return "design-approved";
   return "backlog";
 }
@@ -112,13 +122,29 @@ export function collect(cwd) {
   }
 
   const prsByIssue = new Map();
-  for (const pr of prs) for (const n of linkedIssues(pr)) prsByIssue.set(n, { number: pr.number, url: pr.url });
+  const gatesByIssue = new Map();
+  for (const pr of prs) {
+    const ref = { number: pr.number, url: pr.url };
+    const gate = parseGateMarker(pr.body);
+    if (gate && GATE_REVIEW_STAGE[gate.stage]) {
+      const stage = GATE_REVIEW_STAGE[gate.stage];
+      // Dois gates abertos para a mesma story: o de spec (etapa mais avançada) prevalece.
+      for (const n of gate.stories) if (gatesByIssue.get(n)?.stage !== "spec-review") gatesByIssue.set(n, { ...ref, stage });
+    } else {
+      for (const n of linkedIssues(pr)) prsByIssue.set(n, ref);
+    }
+  }
 
   const all = gh.available ? gh.issues : [];
   const epics = all.filter((i) => has(i, "type:epic"));
   const stories = all
     .filter((i) => has(i, "type:story"))
-    .map((s) => ({ number: s.number, title: s.title, stage: storyStage(s, prsByIssue), pr: prsByIssue.get(s.number) ?? null }))
+    .map((s) => {
+      const stage = storyStage(s, prsByIssue, gatesByIssue);
+      const gate = gatesByIssue.get(s.number);
+      const pr = stage === "in-review" ? prsByIssue.get(s.number) : stage === gate?.stage ? { number: gate.number, url: gate.url } : null;
+      return { number: s.number, title: s.title, stage, pr };
+    })
     .sort((a, b) => a.number - b.number);
 
   const count = (stage) => stories.filter((s) => s.stage === stage).length;
@@ -126,7 +152,9 @@ export function collect(cwd) {
     epics: epics.length,
     stories: stories.length,
     backlog: count("backlog"),
+    designReview: count("design-review"),
     designApproved: count("design-approved"),
+    specReview: count("spec-review"),
     readyForDev: count("ready-for-dev"),
     inReview: count("in-review"),
     done: count("done"),
@@ -150,7 +178,7 @@ export function nextStep(artifacts, stories, ghAvailable, defaultName = "main") 
     return { action: "run", command: cmd, reason: `${a.path} ainda não existe no branch padrão` };
   };
 
-  const product = waiting("discovery", "/esteira:discovery") ?? waiting("prd", "/esteira:prd");
+  const product = waiting("app", "/esteira:setup") ?? waiting("discovery", "/esteira:discovery") ?? waiting("prd", "/esteira:prd");
   if (product) return product;
 
   if (!ghAvailable) return { action: "setup", command: null, reason: "Conecte o repo ao GitHub (gh auth login + remoto) para seguir para o /backlog" };
@@ -164,6 +192,12 @@ export function nextStep(artifacts, stories, ghAvailable, defaultName = "main") 
   const first = (stage) => stories.find((s) => s.stage === stage);
   const review = first("in-review");
   if (review) return { action: "run", command: `/esteira:review ${review.pr.number}`, reason: `PR #${review.pr.number} da story #${review.number} aguarda review`, story: review.number };
+  const gated = first("spec-review") ?? first("design-review");
+  if (gated) {
+    const cmd = gated.stage === "spec-review" ? "/esteira:spec" : "/esteira:prototipo";
+    const what = gated.stage === "spec-review" ? "da spec técnica" : "do protótipo";
+    return { action: "merge", command: `${cmd} ${gated.number}`, pr: gated.pr, story: gated.number, reason: `Revisar e mergear o PR #${gated.pr.number} ${what} da story #${gated.number}` };
+  }
   const ready = first("ready-for-dev");
   if (ready) return { action: "run", command: `/esteira:dev ${ready.number}`, reason: `Story #${ready.number} está pronta para desenvolvimento`, story: ready.number };
   const designed = first("design-approved");

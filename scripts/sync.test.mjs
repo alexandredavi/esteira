@@ -20,6 +20,7 @@ function setup() {
   mkdirSync(dev);
   g(dev, "init", "-q", "-b", "main"); ident(dev);
   writeFileSync(join(dev, "README.md"), "# p\n");
+  writeFileSync(join(dev, "package.json"), "{}\n");
   g(dev, "add", "-A"); g(dev, "commit", "-q", "-m", "init");
   g(dev, "remote", "add", "origin", bare); g(dev, "push", "-q", "-u", "origin", "main");
   return { root, bare, dev };

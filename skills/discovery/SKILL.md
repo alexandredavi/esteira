@@ -11,6 +11,8 @@ Você conduz o discovery de um produto novo. O resultado é **um arquivo** (`doc
 
 Ideia recebida: `$ARGUMENTS`
 
+> **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir` (a ferramenta Write já cria as pastas). Comandos compostos pedem aprovação e travam a etapa.
+
 ## 0. Pré-checagem
 
 Rode com a ferramenta **Bash**, nesta ordem:
@@ -22,7 +24,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs .
 
 O `sync` volta para o branch padrão e traz o que foi mergeado no GitHub (só se não houver mudanças não commitadas). Se ele responder `blocking: true`, mostre o `reason` e pergunte antes de seguir. Com `synced: false` e `blocking: false` (ex.: não é repo git), siga normalmente.
 
-Se a etapa anterior tiver `pendingBranch` (gate só local, sem GitHub), o próximo passo é a pessoa mergear esse branch no padrão: mostre o `next` e pare.
+O discovery **não depende de nenhuma etapa anterior**, nem do `/esteira:setup`: ele pode vir antes do app. Se o `next` do status apontar para outra etapa (ex.: `/esteira:setup`), ignore e siga.
 
 - `artifacts.discovery.merged` é `true` → o discovery já está aprovado. Diga isso, mostre o `next` e **pare**.
 - `artifacts.discovery.pendingPr` existe → já há um PR aguardando merge. Mostre o link e pergunte se a pessoa quer **revisar o arquivo existente**. Se sim, rode `node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs . --to docs/discovery` para voltar ao branch do PR, edite o arquivo e rode o passo 5 de novo, que atualiza o mesmo PR. Se não, pare.

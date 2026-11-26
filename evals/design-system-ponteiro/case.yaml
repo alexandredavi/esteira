@@ -1,0 +1,60 @@
+schema_version: "1.1"
+name: design-system-ponteiro
+description: Com o app montado e o discovery aprovado, /esteira:design-system troca os tokens do tema shadcn, verifica o contraste, gera a vitrine /design e o README do DS.
+tags: [f2, design-system]
+context:
+  scaffold_script: seed.sh
+execution:
+  max_turns: 35
+  allowed_tools: [Skill, Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion]
+  prompt: |
+    /esteira:design-system
+
+    Não vou conseguir responder perguntas agora: siga com as suas recomendações.
+graders:
+  - name: skill-disparou
+    type: tool_used
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:esteira:)?design-system"'
+  - name: contraste-verificado
+    type: regex
+    target: trace
+    pattern: 'contrast\.mjs'
+  - name: primaria-trocada
+    type: regex
+    target: { source: file, path: src/app/globals.css }
+    pattern: '--primary:\s*oklch\(0\.205 0 0\);'
+    match: not_contains
+  - name: estrutura-do-tema-mantida
+    type: regex
+    target: { source: file, path: src/app/globals.css }
+    pattern: '@theme inline[\s\S]*:root \{[\s\S]*\.dark \{[\s\S]*@layer base'
+  - name: idioma-pt-br
+    type: regex
+    target: { source: file, path: src/app/layout.tsx }
+    pattern: 'lang="pt-BR"'
+  - name: vitrine-criada
+    type: file_exists
+    path: src/app/design/page.tsx
+  - name: vitrine-sem-estilos-crus
+    type: regex
+    target: { source: file, path: src/app/design/page.tsx }
+    pattern: '(bg|text|border)-(slate|gray|zinc|neutral|red|blue|green|black|white)(-\d{2,3})?\b|\[#[0-9a-fA-F]{3,6}\]'
+    match: not_contains
+  - name: readme-sem-placeholders
+    type: regex
+    target: { source: file, path: docs/design/README.md }
+    pattern: '\{\{|<!--'
+    match: not_contains
+  - name: qualidade-do-readme
+    type: llm
+    focus: { source: file, path: docs/design/README.md }
+    criteria: |
+      Este é o README do Design System de um time tracker para freelancers chamado Ponteiro.
+      PASS somente se TODOS forem verdade:
+      1. A identidade tem 3 adjetivos coerentes com a proposta de valor (simples, direto, para quem trabalha sozinho).
+      2. Há uma tabela de cores com valores oklch para claro e escuro.
+      3. Há uma tabela de contraste com todos os pares aprovados (nenhum abaixo do mínimo).
+      4. A tipografia cita uma família do Google Fonts e o uso de números tabulares.
+      5. A seção de regras proíbe estilos crus e explica quando criar componente novo.
+      FAIL caso contrário.

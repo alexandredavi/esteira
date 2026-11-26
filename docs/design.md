@@ -337,7 +337,8 @@ Formato de cada episódio: **uso da etapa + 2–4 min de anatomia** da skill (pr
 
 Não decididos na sessão de design; resolver durante F0–F6 e registrar no building-log:
 
-- Granularidade do protótipo: por épico (cobrindo várias stories) ou por story.
+- ~~Granularidade do protótipo~~ → **resolvido na F2**: uma story por padrão; `/esteira:prototipo 10 11` cobre várias num PR só (marcador `stories=10,11`).
+- ~~Onde nasce o app~~ → **resolvido na F2**: `/esteira:setup` (Ep0) monta Next.js + shadcn com versões fixadas (create-next-app 16.4.6, shadcn 4.23.1); o status pede o setup antes de tudo.
 - ~~Onde o discovery busca concorrentes~~ → **resolvido na F1**: o subagente `esteira:pm` usa WebSearch/WebFetch; sem web, marca a fonte como "conhecimento do modelo — validar" e nunca inventa URL.
 - Issues órfãs se o PR do backlog for fechado sem merge (as issues são criadas antes do PR, porque os números entram nos IDs dos ACs).
 - Formato exato do check de rastreabilidade (script Node no CI vs. ação reutilizável publicada no repo `esteira`).

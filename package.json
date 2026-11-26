@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Scripts e testes do plugin esteira (sem dependências de runtime).",
   "scripts": {
-    "test": "node --test \"scripts/*.test.mjs\"",
+    "test": "node --test \"scripts/*.test.mjs\" && node scripts/eval-seeds/build.mjs --check",
     "validate": "claude plugin validate . --strict",
     "eval": "claude plugin eval . --scaffold --allow-tools \"Bash(node:*)\" Write Edit --no-publish"
   },
