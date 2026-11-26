@@ -102,3 +102,30 @@ test("revisão F3: next.config irreconhecível falha ANTES de escrever qualquer 
   assert.equal(existsSync(join(dir, "src/db/index.ts")), false);
   assert.equal(JSON.parse(read(dir, "package.json")).scripts["db:generate"], undefined);
 });
+
+test("F4: ensure deploy — migrate.mjs, runbook e build que migra antes (idempotente)", () => {
+  const dir = app();
+  const pkg = JSON.parse(read(dir, "package.json"));
+  pkg.scripts.build = "next build";
+  writeFileSync(join(dir, "package.json"), JSON.stringify(pkg));
+  const r = ensure("deploy", { cwd: dir, "skip-install": true });
+  assert.equal(r.ok, true, r.error);
+  assert.ok(existsSync(join(dir, "scripts/esteira/migrate.mjs")));
+  assert.match(read(dir, "docs/deploy.md"), /## Rollback/);
+  assert.equal(JSON.parse(read(dir, "package.json")).scripts.build, "node scripts/esteira/migrate.mjs && next build");
+  ensure("deploy", { cwd: dir, "skip-install": true });
+  assert.equal(JSON.parse(read(dir, "package.json")).scripts.build, "node scripts/esteira/migrate.mjs && next build");
+});
+
+test("F4: ensure release — workflow, config e manifest com a versão do app", () => {
+  const dir = app();
+  const pkg = JSON.parse(read(dir, "package.json"));
+  pkg.version = "0.3.0";
+  writeFileSync(join(dir, "package.json"), JSON.stringify(pkg));
+  const r = ensure("release", { cwd: dir, "skip-install": true });
+  assert.equal(r.ok, true, r.error);
+  assert.match(read(dir, ".github/workflows/release-please.yml"), /release-please-action@v5/);
+  assert.equal(JSON.parse(read(dir, "release-please-config.json")).packages["."]["release-type"], "node");
+  assert.deepEqual(JSON.parse(read(dir, ".release-please-manifest.json")), { ".": "0.3.0" });
+  assert.ok(r.paths.includes(".release-please-manifest.json"));
+});
