@@ -9,9 +9,9 @@
 //
 // Sempre imprime JSON. Sem git ou sem GitHub, não falha: diz o que ficou salvo e o que falta.
 
-import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdtempSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { git, gh, defaultBranch, parseArgs, list, print } from "./lib.mjs";
 
@@ -26,6 +26,14 @@ export function parseGateMarker(body) {
 }
 
 const TEMPLATES = fileURLToPath(new URL("../templates/gates/", import.meta.url));
+
+// Lê um arquivo ou diretório (recursivo) do working tree: [{ path, content }].
+function readTree(cwd, rel) {
+  const abs = join(cwd, rel);
+  if (!existsSync(abs)) return [];
+  if (!statSync(abs).isDirectory()) return [{ path: rel, content: readFileSync(abs) }];
+  return readdirSync(abs).flatMap((name) => readTree(cwd, `${rel.replace(/\/$/, "")}/${name}`));
+}
 
 // Corpo do PR: resumo (da skill) + checklist da etapa (templates/gates/<etapa>.md) + marcador.
 export function buildBody({ cwd = ".", stage, stories = [], summary, bodyFile }) {
@@ -61,17 +69,36 @@ export function openGate(opts) {
   const current = git(cwd, "branch", "--show-current").out;
   if (current !== branch) {
     const exists = git(cwd, "rev-parse", "--verify", "--quiet", `refs/heads/${branch}`).ok;
-    const hasBase = git(cwd, "rev-parse", "--verify", "--quiet", baseBranch).ok;
-    const sw = exists ? git(cwd, "switch", branch) : git(cwd, "switch", "-c", branch, ...(hasBase ? [baseBranch] : []));
-    if (!sw.ok) return { ok: false, error: `Não consegui trocar para o branch ${branch}: ${sw.err}` };
+    if (exists) {
+      // Revisão de um gate já aberto, feita a partir de outro branch: guarda a versão nova dos artefatos,
+      // tira do caminho (stash), troca de branch e reaplica por cima.
+      const snapshot = paths.flatMap((p) => readTree(cwd, p));
+      const hadChanges = git(cwd, "status", "--porcelain", "--", ...paths).out !== "";
+      if (hadChanges) {
+        const st = git(cwd, "stash", "push", "--include-untracked", "-m", `esteira-gate-${stage}`, "--", ...paths);
+        if (!st.ok) return { ok: false, error: `Não consegui guardar os artefatos antes de trocar de branch: ${st.err}` };
+      }
+      const sw = git(cwd, "switch", branch);
+      if (!sw.ok) {
+        if (hadChanges) git(cwd, "stash", "pop");
+        return { ok: false, error: `Não consegui trocar para o branch ${branch}: ${sw.err}` };
+      }
+      for (const f of snapshot) { mkdirSync(dirname(join(cwd, f.path)), { recursive: true }); writeFileSync(join(cwd, f.path), f.content); }
+      if (hadChanges) git(cwd, "stash", "drop");
+    } else {
+      const hasBase = git(cwd, "rev-parse", "--verify", "--quiet", baseBranch).ok;
+      const sw = git(cwd, "switch", "-c", branch, ...(hasBase ? [baseBranch] : []));
+      if (!sw.ok) return { ok: false, error: `Não consegui criar o branch ${branch}: ${sw.err}` };
+    }
   }
 
   const add = git(cwd, "add", "--", ...paths);
   if (!add.ok) return { ok: false, error: `git add falhou: ${add.err}` };
-  const nothingStaged = git(cwd, "diff", "--cached", "--quiet").ok;
+  // Só os caminhos da etapa entram no commit, mesmo que haja outras coisas no stage.
+  const nothingStaged = git(cwd, "diff", "--cached", "--quiet", "--", ...paths).ok;
   let committed = false;
   if (!nothingStaged) {
-    const c = git(cwd, "commit", "-m", title);
+    const c = git(cwd, "commit", "-m", title, "--", ...paths);
     if (!c.ok) return { ok: false, error: `git commit falhou: ${c.err}` };
     committed = true;
   }

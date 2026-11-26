@@ -19,10 +19,15 @@ graders:
   - name: plano-escrito
     type: file_exists
     path: .esteira/backlog.plan.json
-  - name: specs-geradas
+  - name: previa-gerada
     type: regex
     target: files
-    pattern: 'docs/specs/\d+-[a-z0-9-]+\.md'
+    pattern: '\.esteira/specs-preview/\d+-[a-z0-9-]+\.md'
+  - name: nada-em-docs-specs
+    type: regex
+    target: files
+    pattern: 'docs/specs/'
+    match: not_contains
   - name: script-publicou-em-dry-run
     type: regex
     target: trace

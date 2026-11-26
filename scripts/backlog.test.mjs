@@ -80,7 +80,8 @@ test("dry-run: numera épicos primeiro, escreve specs e não chama o GitHub", ()
   assert.equal(r.simulated, true);
   assert.deepEqual(r.epics.map((e) => e.number), [1, 2]);
   assert.deepEqual(r.stories.map((s) => s.number), [3, 4, 5]);
-  assert.deepEqual(r.files, ["docs/specs/3-timer-start-stop.md", "docs/specs/4-lancamento-manual.md", "docs/specs/5-relatorio-por-projeto.md"]);
+  assert.deepEqual(r.files, [".esteira/specs-preview/3-timer-start-stop.md", ".esteira/specs-preview/4-lancamento-manual.md", ".esteira/specs-preview/5-relatorio-por-projeto.md"]);
+  assert.equal(existsSync(join(dir, "docs/specs")), false, "dry-run não pode escrever em docs/specs");
   assert.deepEqual(r.stories[0].acceptance, ["AC-3.1", "AC-3.2"]);
   assert.ok(existsSync(join(dir, r.files[0])));
   assert.equal(existsSync(process.env.ESTEIRA_FAKE_GH), false);
@@ -119,8 +120,8 @@ test("publicação: labels, épicos antes de stories, corpos com IDs reais", () 
 
 test("idempotente: reaproveita issues com o mesmo título", () => {
   process.env.ESTEIRA_FAKE_GH_ISSUES = JSON.stringify([
-    { number: 7, title: "[CAP-1] Registrar tempo", url: "https://github.com/fake/produto/issues/7", labels: [] },
-    { number: 9, title: "Story timer-start-stop", url: "https://github.com/fake/produto/issues/9", labels: [] },
+    { number: 7, title: "[CAP-1] Registrar tempo", url: "https://github.com/fake/produto/issues/7", labels: [{ name: "type:epic" }] },
+    { number: 9, title: "Story timer-start-stop", url: "https://github.com/fake/produto/issues/9", labels: [{ name: "type:story" }] },
   ]);
   const r = publish({ cwd: workdir(), plan: ".esteira/backlog.plan.json" });
   assert.equal(r.epics[0].number, 7);
@@ -136,4 +137,56 @@ test("GitHub Project opcional adiciona épicos e stories", () => {
   const adds = calls().filter((x) => x[0] === "project");
   assert.equal(adds.length, 5);
   assert.deepEqual(adds[0].slice(0, 5), ["project", "item-add", "3", "--owner", "alguem"]);
+});
+
+test("revisão: outOfScope precisa ser lista e itens precisam ser objetos", () => {
+  const p = plan();
+  p.epics[0].stories[0].outOfScope = "nada";
+  assert.match(validatePlan(p).join(), /outOfScope deve ser uma lista/);
+  assert.match(validatePlan({ epics: [null] }).join(), /deve ser um objeto/);
+  const q = plan();
+  q.epics[0].stories[0].acceptance = [null];
+  assert.match(validatePlan(q).join(), /deve ser um objeto \{ title, gherkin \}/);
+});
+
+test("revisão: títulos repetidos entre stories são rejeitados", () => {
+  const p = plan();
+  p.epics[1].stories[0].title = p.epics[0].stories[0].title;
+  assert.match(validatePlan(p).join(), /repete o título/);
+});
+
+test("revisão: Dada/Dados/Dadas são palavras-chave válidas", () => {
+  const p = plan();
+  p.epics[0].stories[0].acceptance = [
+    { title: "a", gherkin: "Dada uma cliente\nQuando abro\nEntão vejo" },
+    { title: "b", gherkin: "Dados dois projetos\nE um registro\nQuando abro\nEntao vejo\nMas não vejo outro" },
+  ];
+  assert.deepEqual(validatePlan(p), []);
+  p.epics[0].stories[0].acceptance = [{ title: "c", gherkin: "Dadinho\nQuando x\nEntão y" }];
+  assert.match(validatePlan(p).join(), /Dado, Quando e Então/);
+});
+
+test("revisão: issue sem a label da esteira não é reaproveitada mesmo com título igual", () => {
+  process.env.ESTEIRA_FAKE_GH_ISSUES = JSON.stringify([
+    { number: 3, title: "Story timer-start-stop", url: "https://github.com/fake/produto/issues/3", labels: [{ name: "bug" }] },
+  ]);
+  const r = publish({ cwd: workdir(), plan: ".esteira/backlog.plan.json" });
+  assert.notEqual(r.stories[0].number, 3);
+  assert.equal(r.stories[0].created, true);
+});
+
+test("revisão: listagem filtra por label para idempotência", () => {
+  publish({ cwd: workdir(), plan: ".esteira/backlog.plan.json" });
+  const lists = calls().filter((x) => x[0] === "issue" && x[1] === "list").map((x) => x[x.indexOf("--label") + 1]);
+  assert.deepEqual(lists, ["type:epic", "type:story"]);
+});
+
+test("revisão: spec com número antigo do mesmo slug é substituída", () => {
+  const dir = workdir();
+  mkdirSync(join(dir, "docs/specs"), { recursive: true });
+  writeFileSync(join(dir, "docs/specs/3-timer-start-stop.md"), "antigo");
+  const r = publish({ cwd: dir, plan: ".esteira/backlog.plan.json" });
+  const n = r.stories[0].number;
+  assert.ok(existsSync(join(dir, `docs/specs/${n}-timer-start-stop.md`)));
+  assert.equal(existsSync(join(dir, "docs/specs/3-timer-start-stop.md")), n === 3);
 });

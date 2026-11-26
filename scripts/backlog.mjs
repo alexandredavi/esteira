@@ -7,9 +7,10 @@
 // → reescreve o corpo das stories com os IDs AC-<issue>.<n> → checklist no épico
 // → (opcional) adiciona ao GitHub Project → escreve docs/specs/<issue>-<slug>.md.
 // Idempotente por título: rodar de novo reaproveita issues existentes.
-// --dry-run: não toca no GitHub; numera as issues de forma simulada (épicos primeiro) e escreve as specs.
+// --dry-run: não toca no GitHub; numera as issues de forma simulada (épicos primeiro) e escreve uma
+// prévia em .esteira/specs-preview/ (nunca em docs/specs, para números falsos não irem para o repo).
 
-import { mkdirSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
@@ -17,34 +18,55 @@ import { gh, parseArgs, print } from "./lib.mjs";
 
 const PLUGIN = fileURLToPath(new URL("../", import.meta.url));
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const STEP = /^(dado|quando|então|entao|e|mas)\b/i;
+// Palavras-chave Gherkin PT: Dado/Dada/Dados/Dadas, Quando, Então, E, Mas. (\b do JS não entende acento, por isso o lookahead.)
+const KW = { given: "dad[oa]s?", when: "quando", then: "ent[aã]o", and: "e", but: "mas" };
+const startsWith = (kw) => new RegExp(`^(?:${kw})(?=\\s|$)`, "i");
+const STEP = startsWith(Object.values(KW).join("|"));
+const SCENARIO = /^cen[aá]rio:/i;
+const isObj = (x) => x !== null && typeof x === "object" && !Array.isArray(x);
+const isText = (x) => typeof x === "string" && x.trim() !== "";
 
 export function validatePlan(plan) {
   const errors = [];
-  if (!plan || !Array.isArray(plan.epics) || plan.epics.length === 0) return ["O plano precisa de pelo menos um épico em `epics`."];
+  if (!isObj(plan) || !Array.isArray(plan.epics) || plan.epics.length === 0) return ["O plano precisa de pelo menos um épico em `epics`."];
   const slugs = new Set();
+  const titles = new Map();
+  const seeTitle = (title, where) => {
+    const key = String(title).trim().toLowerCase();
+    if (titles.has(key)) errors.push(`${where}.title "${title}" repete o título de ${titles.get(key)}; títulos de épicos e stories precisam ser únicos.`);
+    else titles.set(key, where);
+  };
   let total = 0;
   plan.epics.forEach((e, i) => {
     const where = `epics[${i}]`;
+    if (!isObj(e)) { errors.push(`${where} deve ser um objeto.`); return; }
     if (!/^CAP-\d+$/.test(e.cap ?? "")) errors.push(`${where}.cap deve ser CAP-<n> (capacidade do PRD).`);
-    if (!e.title) errors.push(`${where}.title é obrigatório.`);
-    if (!e.description) errors.push(`${where}.description é obrigatório.`);
+    if (!isText(e.title)) errors.push(`${where}.title é obrigatório.`);
+    else seeTitle(`[${e.cap}] ${e.title}`, where);
+    if (!isText(e.description)) errors.push(`${where}.description é obrigatório.`);
     if (!Array.isArray(e.stories) || e.stories.length === 0) { errors.push(`${where} precisa de pelo menos uma story.`); return; }
     e.stories.forEach((s, j) => {
       total++;
       const sw = `${where}.stories[${j}]`;
-      for (const k of ["title", "slug", "asA", "iWant", "soThat", "context"]) if (!s[k]) errors.push(`${sw}.${k} é obrigatório.`);
-      if (s.slug && !SLUG.test(s.slug)) errors.push(`${sw}.slug "${s.slug}" deve ser kebab-case (a-z, 0-9, -).`);
-      if (s.slug && slugs.has(s.slug)) errors.push(`${sw}.slug "${s.slug}" repetido.`);
+      if (!isObj(s)) { errors.push(`${sw} deve ser um objeto.`); return; }
+      for (const k of ["title", "slug", "asA", "iWant", "soThat", "context"]) if (!isText(s[k])) errors.push(`${sw}.${k} é obrigatório (texto).`);
+      if (isText(s.title)) seeTitle(s.title, sw);
+      if (isText(s.slug) && !SLUG.test(s.slug)) errors.push(`${sw}.slug "${s.slug}" deve ser kebab-case (a-z, 0-9, -).`);
+      if (isText(s.slug) && slugs.has(s.slug)) errors.push(`${sw}.slug "${s.slug}" repetido.`);
       slugs.add(s.slug);
+      if (s.outOfScope !== undefined && (!Array.isArray(s.outOfScope) || !s.outOfScope.every(isText))) {
+        errors.push(`${sw}.outOfScope deve ser uma lista de textos (ou ser omitido).`);
+      }
       if (!Array.isArray(s.acceptance) || s.acceptance.length === 0) { errors.push(`${sw} precisa de pelo menos um critério de aceite.`); return; }
       s.acceptance.forEach((ac, k) => {
         const aw = `${sw}.acceptance[${k}]`;
-        if (!ac.title) errors.push(`${aw}.title é obrigatório.`);
-        const lines = String(ac.gherkin ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
-        const has = (w) => lines.some((l) => new RegExp(`^${w}\\b`, "i").test(l));
-        if (!has("dado") || !has("quando") || !(has("então") || has("entao"))) errors.push(`${aw}.gherkin precisa ter linhas Dado, Quando e Então.`);
-        const bad = lines.find((l) => !STEP.test(l) && !/^cen[aá]rio:/i.test(l));
+        if (!isObj(ac)) { errors.push(`${aw} deve ser um objeto { title, gherkin }.`); return; }
+        if (!isText(ac.title)) errors.push(`${aw}.title é obrigatório.`);
+        if (!isText(ac.gherkin)) { errors.push(`${aw}.gherkin é obrigatório.`); return; }
+        const lines = ac.gherkin.split("\n").map((l) => l.trim()).filter(Boolean);
+        const has = (kw) => lines.some((l) => startsWith(kw).test(l));
+        if (!has(KW.given) || !has(KW.when) || !has(KW.then)) errors.push(`${aw}.gherkin precisa ter linhas Dado, Quando e Então.`);
+        const bad = lines.find((l) => !STEP.test(l) && !SCENARIO.test(l));
         if (bad) errors.push(`${aw}.gherkin tem uma linha que não é passo Gherkin: "${bad}".`);
       });
     });
@@ -56,7 +78,7 @@ export function validatePlan(plan) {
 export const acId = (number, k) => `AC-${number}.${k + 1}`;
 
 export function renderGherkin(ac) {
-  const steps = String(ac.gherkin).split("\n").map((l) => l.trim()).filter((l) => l && !/^cen[aá]rio:/i.test(l));
+  const steps = String(ac.gherkin).split("\n").map((l) => l.trim()).filter((l) => l && !SCENARIO.test(l));
   return ["```gherkin", `Cenário: ${ac.title}`, ...steps.map((l) => `  ${l}`), "```"].join("\n");
 }
 
@@ -72,7 +94,10 @@ export function renderSpec(story, epic, template) {
   return template.replace(/{{(\w+)}}/g, (m, k) => (k in values ? String(values[k]) : m));
 }
 
-export const specPath = (story) => `docs/specs/${story.number}-${story.slug}.md`;
+const SPECS_DIR = "docs/specs";
+const PREVIEW_DIR = ".esteira/specs-preview";
+export const specPath = (story) => `${SPECS_DIR}/${story.number}-${story.slug}.md`;
+const labelNames = (i) => (i.labels ?? []).map((l) => (typeof l === "string" ? l : l.name));
 
 export function renderStoryBody(story, epic) {
   const acs = story.acceptance.map((ac, k) => `- **${acId(story.number, k)}** — ${ac.title}`).join("\n");
@@ -124,12 +149,17 @@ export function publish(opts) {
       const r = gh(cwd, "label", "create", l.name, "--color", l.color, "--description", l.description, "--force");
       if (!r.ok) warnings.push(`Label ${l.name}: ${r.err}`);
     }
-    const listed = gh(cwd, "issue", "list", "--state", "all", "--limit", "500", "--json", "number,title,url,labels");
-    const existing = listed.ok ? JSON.parse(listed.out || "[]") : [];
-    const find = (title) => existing.find((i) => i.title === title);
+    // Idempotência: só reaproveita issues da própria esteira (com a label do tipo), nunca uma issue qualquer com o mesmo título.
+    const existing = {};
+    for (const label of ["type:epic", "type:story"]) {
+      const listed = gh(cwd, "issue", "list", "--state", "all", "--limit", "1000", "--label", label, "--json", "number,title,url,labels");
+      if (!listed.ok) return { ok: false, error: `Não consegui listar as issues com a label ${label} (necessário para não duplicar): ${listed.err}` };
+      existing[label] = JSON.parse(listed.out || "[]").filter((i) => labelNames(i).includes(label));
+    }
+    const find = (title, label) => existing[label].find((i) => i.title === title);
 
     const create = (title, label, body) => {
-      const found = find(title);
+      const found = find(title, label);
       if (found) return { number: found.number, url: found.url, created: false };
       const r = gh(cwd, "issue", "create", "--title", title, "--label", label, "--body-file", bodyFile(body));
       if (!r.ok) throw new Error(`gh issue create "${title}": ${r.err}`);
@@ -160,12 +190,17 @@ export function publish(opts) {
     }
   }
 
+  // Em dry-run os números são de mentira: a prévia vai para .esteira/specs-preview e nunca para docs/specs.
   const template = readFileSync(join(PLUGIN, "templates/spec.md"), "utf8");
+  const dir = dryRun ? PREVIEW_DIR : SPECS_DIR;
+  mkdirSync(join(cwd, dir), { recursive: true });
   const files = [];
   for (const e of epics) {
     for (const s of e.stories) {
-      const path = specPath(s);
-      mkdirSync(join(cwd, "docs/specs"), { recursive: true });
+      const path = `${dir}/${s.number}-${s.slug}.md`;
+      for (const old of readdirSync(join(cwd, dir))) {
+        if (old !== `${s.number}-${s.slug}.md` && old.replace(/^\d+-/, "") === `${s.slug}.md`) rmSync(join(cwd, dir, old));
+      }
       writeFileSync(join(cwd, path), renderSpec(s, e, template));
       files.push(path);
     }
@@ -184,6 +219,8 @@ function summarize(epics) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const result = publish(parseArgs(process.argv.slice(2)));
+  let result;
+  try { result = publish(parseArgs(process.argv.slice(2))); }
+  catch (err) { result = { ok: false, error: `Falha inesperada: ${err.message}` }; }
   print(result, result.ok ? 0 : 1);
 }
