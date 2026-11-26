@@ -1,0 +1,12 @@
+{
+  "$comment": "Labels canônicas da esteira. /backlog cria estas labels no repo do produto; /esteira lê o estado a partir delas.",
+  "types": [
+    { "name": "type:epic", "color": "5319e7", "description": "Épico do backlog" },
+    { "name": "type:story", "color": "1d76db", "description": "Story do backlog" }
+  ],
+  "states": [
+    { "name": "design:approved", "color": "fbca04", "description": "Protótipo aprovado (PR de /prototipo mergeado)" },
+    { "name": "spec:approved", "color": "0e8a16", "description": "Spec técnica aprovada (PR de /spec mergeado)" },
+    { "name": "ready-for-dev", "color": "0e8a16", "description": "Pronta para /dev" }
+  ]
+}

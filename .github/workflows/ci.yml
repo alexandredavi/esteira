@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Testes dos scripts + validação do plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
+      - name: Instalar Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Validar plugin e marketplace
+        run: claude plugin validate . --strict
+
+  evals:
+    name: Evals das skills
+    runs-on: ubuntu-latest
+    needs: test
+    # Só roda quando o secret existe (forks e PRs externos não têm acesso).
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Instalar Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+      - name: Rodar evals
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::Secret ANTHROPIC_API_KEY não configurado — evals pulados."
+            exit 0
+          fi
+          claude plugin eval . --trust-plugin \
+            --allow-tools "Bash(node:*)" \
+            --threshold 0.8 \
+            --no-publish \
+            --max-cost-usd 5 \
+            --json eval-results.json
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && hashFiles('eval-results.json') != '' }}
+        with:
+          name: eval-results
+          path: eval-results.json

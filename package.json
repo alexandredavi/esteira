@@ -1,0 +1,12 @@
+{
+  "name": "esteira",
+  "private": true,
+  "type": "module",
+  "description": "Scripts e testes do plugin esteira (sem dependências de runtime).",
+  "scripts": {
+    "test": "node --test \"scripts/*.test.mjs\"",
+    "validate": "claude plugin validate . --strict",
+    "eval": "claude plugin eval . --allow-tools \"Bash(node:*)\" --no-publish"
+  },
+  "engines": { "node": ">=22" }
+}

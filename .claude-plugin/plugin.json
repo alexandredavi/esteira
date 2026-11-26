@@ -1,0 +1,8 @@
+{
+  "name": "esteira",
+  "version": "0.1.0",
+  "description": "Esteira de produto e desenvolvimento conduzida por IA: discovery, PRD, backlog, design system, protótipo, spec, dev, testes, review, deploy e release — com gates humanos via Pull Request.",
+  "author": { "name": "Alexandre Zanelatto" },
+  "license": "MIT",
+  "keywords": ["esteira", "produto", "backlog", "spec", "design-system", "tdd", "gherkin", "pt-br"]
+}

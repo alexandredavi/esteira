@@ -1,0 +1,12 @@
+{
+  "name": "esteira",
+  "description": "Marketplace da esteira de desenvolvimento com IA",
+  "owner": { "name": "Alexandre Zanelatto" },
+  "plugins": [
+    {
+      "name": "esteira",
+      "source": "./",
+      "description": "Esteira de produto e desenvolvimento conduzida por IA, do discovery ao deploy."
+    }
+  ]
+}
