@@ -134,3 +134,26 @@ test("dry-run F6: release-please sem prefixo de componente na tag (v0.2.0, não 
   const cfg = JSON.parse(readFileSync(new URL("../templates/app/release-please-config.json", import.meta.url), "utf8"));
   assert.equal(cfg.packages["."]["include-component-in-tag"], false);
 });
+
+test("F5: ensure piloto — workflow do piloto, gates v1 → v2 e CI v2 → v3 (com workflow_dispatch)", () => {
+  const dir = app();
+  const legacy = (f) => readFileSync(new URL(`../templates/app/workflows/legacy/${f}`, import.meta.url), "utf8");
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), legacy("ci-v2.yml"));
+  writeFileSync(join(dir, ".github/workflows/esteira-gates.yml"), legacy("esteira-gates-v1.yml"));
+  const r = ensure("piloto", { cwd: dir, "skip-install": true });
+  assert.equal(r.ok, true, r.error);
+  assert.match(read(dir, ".github/workflows/esteira-piloto.yml"), /anthropics\/claude-code-action@v1/);
+  assert.match(read(dir, ".github/workflows/esteira-gates.yml"), /gh workflow run esteira-piloto\.yml/);
+  assert.match(read(dir, ".github/workflows/ci.yml"), /workflow_dispatch:/);
+  assert.deepEqual(r.notes, []);
+});
+
+test("F5: gates e CI customizados não são sobrescritos (só aviso)", () => {
+  const dir = app();
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "name: ci\n# meu CI\n");
+  writeFileSync(join(dir, ".github/workflows/esteira-gates.yml"), "name: esteira-gates\n# meu\n");
+  const r = ensure("piloto", { cwd: dir, "skip-install": true });
+  assert.equal(read(dir, ".github/workflows/ci.yml"), "name: ci\n# meu CI\n");
+  assert.equal(read(dir, ".github/workflows/esteira-gates.yml"), "name: esteira-gates\n# meu\n");
+  assert.equal(r.notes.length, 2);
+});
