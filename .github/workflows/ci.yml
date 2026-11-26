@@ -41,8 +41,9 @@ jobs:
             echo "::warning::Secret ANTHROPIC_API_KEY não configurado — evals pulados."
             exit 0
           fi
-          claude plugin eval . --trust-plugin \
-            --allow-tools "Bash(node:*)" \
+          claude plugin eval . --trust-plugin --scaffold \
+            --allow-tools "Bash(node:*)" Write Edit \
+            --runs 1 --ablation none \
             --threshold 0.8 \
             --no-publish \
             --max-cost-usd 5 \

@@ -43,3 +43,33 @@ Formato de cada entrada:
 **Decisão:**
 - Toda lógica de estado fica em scripts determinísticos testados, e a skill só formata. Isso fica mais barato, testável e previsível para gravar.
 - O artefato só conta como feito quando está no branch padrão, ou seja, quando entrou por PR mergeado.
+
+## 2026-11-26 — F1 — Etapas de produto (discovery, PRD, backlog)
+
+**O que fiz:**
+- Skills `/esteira:discovery`, `/esteira:prd` e `/esteira:backlog`, e o subagente `esteira:pm`, que pesquisa os concorrentes com fonte.
+- Templates de discovery, PRD e spec por story, mais um checklist do revisor por etapa em `templates/gates/`.
+- `scripts/gate.mjs`: branch → commit → push → PR, com o checklist da etapa e um marcador `<!-- esteira:gate stage=… stories=… -->`. As automações das próximas fases vão ler esse marcador para aplicar as labels no merge.
+- `scripts/backlog.mjs`: valida o plano JSON (CAP-n, slugs, Gherkin), garante as labels, cria épicos e depois stories (ordem = prioridade), reescreve o corpo com os IDs `AC-<issue>.<n>`, põe um checklist no épico, adiciona ao GitHub Project (opcional) e escreve `docs/specs/<issue>-<slug>.md`. É idempotente por título e tem `--dry-run`.
+- O status agora reconhece o backlog: as specs no branch padrão ou o PR do backlog aguardando merge.
+- 32 testes `node --test` (o `gh` falso registra as chamadas) e 3 evals novos, com `scaffold_script` para semear os arquivos.
+
+**Teste de ponta a ponta** num repo temporário sem GitHub, simulando cada merge:
+
+| Etapa | Custo | Resultado |
+|---|---|---|
+| discovery | US$ 0,73 | O PM pesquisou Toggl, Clockify e Harvest com URLs reais; 8 premissas; nome "Lida" |
+| PRD | US$ 0,54 | 5 capacidades e métricas, sem nenhuma permissão negada |
+| backlog (simulado) | US$ 0,83 | Plano válido de primeira: 5 épicos, 20 stories e 52 ACs em Gherkin, com caminho feliz, erro e vazio |
+
+**O que deu errado / surpreendeu:**
+- O modelo tentou ler o template com `cat` pelo Bash. Foi bloqueado, porque o plugin fica fora do diretório de trabalho. Agora as skills mandam usar a ferramenta Read.
+- A "Ideia original" copiou também a instrução da sessão ("não vou conseguir responder perguntas"). A regra agora é guardar só a ideia.
+- As user stories saíram como "para minhas horas fiquem registradas": os campos são renderizados literalmente, então a skill passou a exigir que cada campo complete a frase.
+- Evals não aceitam respostas roteirizadas para o AskUserQuestion. Todas as skills ganharam um modo não interativo: seguem com as recomendações e registram as premissas.
+- Os issues do backlog são criados **antes** do merge do PR, porque os números das issues entram nos IDs dos ACs. O gate aprova o conteúdo das specs. Se o PR for fechado sem merge, as issues ficam órfãs; tratar isso na F6.
+- O `gh` atual não tem o escopo `project`. O GitHub Project fica opcional (`gh auth refresh -s project`).
+
+**Decisão:**
+- A IA planeja e o script publica: o plano em JSON é o contrato entre as duas partes.
+- A prioridade é a ordem das issues (a primeira story é a próxima a andar). Não criei campo de prioridade.

@@ -19,7 +19,7 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs $ARGUMENTS .
 
 (se `$ARGUMENTS` vier vazio, o `.` final aponta para o diretório atual). A saída é JSON com:
 
-- `artifacts.{discovery,prd,designSystem}` — `merged` (está no branch padrão) e `pendingPr` (PR aberto que cria o arquivo)
+- `artifacts.{discovery,prd,backlog,designSystem}` — `merged` (está no branch padrão; para o backlog, `docs/specs/`) e `pendingPr` (PR de gate aberto para a etapa)
 - `github` — `"ok"` ou o motivo de não conseguir ler issues/PRs
 - `summary` — contagem de épicos e stories por estágio
 - `stories[]` — `number`, `title`, `stage` (`backlog` → `design-approved` → `ready-for-dev` → `in-review` → `done`), `pr`
@@ -38,7 +38,7 @@ Responda em PT-BR, curto, neste formato:
 |---|---|
 | Discovery | ✅ mergeado / 🔶 PR #n aguardando merge / ⬜ pendente |
 | PRD | … |
-| Backlog | <n> épicos, <n> stories (ou ⬜ pendente) |
+| Backlog | <n> épicos, <n> stories + estado das specs (✅ / 🔶 PR #n / ⬜) |
 | Design System | … |
 | Stories | backlog <n> · protótipo aprovado <n> · prontas p/ dev <n> · em review <n> · concluídas <n> |
 

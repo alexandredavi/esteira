@@ -10,10 +10,12 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+// path: o que precisa existir no branch padrão; prPrefix: arquivos que um PR de gate dessa etapa toca.
 const ARTIFACTS = {
-  discovery: "docs/product/discovery.md",
-  prd: "docs/product/prd.md",
-  designSystem: "docs/design/README.md",
+  discovery: { path: "docs/product/discovery.md", prPrefix: "docs/product/discovery.md" },
+  prd: { path: "docs/product/prd.md", prPrefix: "docs/product/prd.md" },
+  backlog: { path: "docs/specs", prPrefix: "docs/specs/" },
+  designSystem: { path: "docs/design/README.md", prPrefix: "docs/design/" },
 };
 
 function run(cmd, args, cwd) {
@@ -88,9 +90,9 @@ export function collect(cwd) {
   const prs = gh.available ? gh.prs : [];
 
   const artifacts = {};
-  for (const [key, path] of Object.entries(ARTIFACTS)) {
+  for (const [key, { path, prPrefix }] of Object.entries(ARTIFACTS)) {
     const merged = artifactState(cwd, branch, path);
-    const pr = merged ? null : pendingStagePr(prs, key === "designSystem" ? "docs/design/" : path);
+    const pr = merged ? null : pendingStagePr(prs, prPrefix);
     artifacts[key] = { path, merged, pendingPr: pr ? { number: pr.number, url: pr.url } : null };
   }
 
@@ -131,6 +133,8 @@ export function nextStep(artifacts, stories, ghAvailable) {
 
   if (!ghAvailable) return { action: "setup", command: null, reason: "Conecte o repo ao GitHub (gh auth login + remoto) para seguir para o /backlog" };
   if (stories.length === 0) return { action: "run", command: "/esteira:backlog", reason: "Nenhuma story com a label type:story" };
+  const specs = waiting("backlog", "/esteira:backlog");
+  if (specs) return specs;
 
   const ds = waiting("designSystem", "/esteira:design-system");
   if (ds) return ds;
