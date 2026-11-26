@@ -14,6 +14,8 @@ const app = readFileSync(join(HERE, "app.sh"), "utf8").replace(/^#!.*\n/, "").re
 
 const SPEC_10 = readFileSync(join(HERE, "spec-10.md"), "utf8");
 const DS_README = readFileSync(join(HERE, "design-readme.md"), "utf8");
+const SPEC_10_DESIGN = readFileSync(join(HERE, "spec-10-design.md"), "utf8");
+const TYPES = readFileSync(join(HERE, "tipos-tempo.ts"), "utf8");
 
 export const SEEDS = {
   "evals/design-system-ponteiro/seed.sh": app,
@@ -24,6 +26,18 @@ ${DS_README.trimEnd()}
 EOF
 cat > docs/specs/10-timer-iniciar-parar.md <<'EOF'
 ${SPEC_10.trimEnd()}
+EOF
+`,
+  "evals/spec-timer/seed.sh": `${app}
+mkdir -p docs/specs docs/design src/lib/types
+cat > docs/design/README.md <<'EOF'
+${DS_README.trimEnd()}
+EOF
+cat > docs/specs/10-timer-iniciar-parar.md <<'EOF'
+${SPEC_10_DESIGN.trimEnd()}
+EOF
+cat > src/lib/types/tempo.ts <<'EOF'
+${TYPES.trimEnd()}
 EOF
 `,
 };

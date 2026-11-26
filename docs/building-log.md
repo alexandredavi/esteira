@@ -146,3 +146,52 @@ Conferi as telas no navegador: o timer conta de verdade, e a vitrine mostra os d
 **E o PC reiniciou no meio das correções.** Nada se perdeu: o trabalho estava no disco, no branch `feat/f2-design`, e o diário e os testes mostraram exatamente onde parei.
 
 **Mais uma depois da revisão:** o setup real, rodado de novo para validar as correções, **quebrou o build** com `Can't resolve '...'`. O Tailwind v4 varre todo o projeto atrás de classes, inclusive a regra de lint. Um **comentário** com o exemplo `bg-[url` + `(...)]` virou CSS com `url(...)`, e o Turbopack tentou resolver o arquivo "...". Corrigi o comentário e criei um teste que impede `[url(` no arquivo da regra. Moral: o teste de ponta a ponta de verdade (setup → lint → build) pega o que nenhum teste unitário e nenhuma revisão pegaram.
+
+## 2026-11-26 — F3 — Spec técnica, dev e testes de aceite
+
+**O que fiz:**
+- Antes de escrever template, validei a base num app de prova: Drizzle + **PGlite** (Postgres em processo) dentro do servidor Next 16 em build de produção, uma server action, Vitest com banco em memória e Playwright com o banco zerado entre os testes. Só então virou template.
+- `ensure.mjs db|tests`: instala no produto, de forma idempotente, a camada de dados e a de testes:
+  - `getDb()` usa o Neon quando existe `DATABASE_URL`; sem ela usa PGlite, que serve para dev, testes e CI sem infraestrutura nenhuma;
+  - Vitest, Playwright e a rota `/api/e2e/reset`, que só existe com `E2E=1`;
+  - o CI v2, com atualização automática do v1.
+- `traceability.mjs`, que vai para o produto: todo AC de spec com `status: dev|done` precisa de um teste com o ID no título. `test.skip` não conta.
+- Estado da story **no git**: o `status` no frontmatter da spec (backlog → design → spec → dev → done) é atualizado por cada etapa e aprovado junto com o PR. Funciona sem GitHub.
+- Skills `/esteira:spec`, `/esteira:dev` e `/esteira:testes`. O gate ganhou `--closes` e `--allow-missing`. O status passou a sugerir `/esteira:testes` antes do `/esteira:review` quando o branch do PR não tem teste de aceite.
+
+**Teste de ponta a ponta da story #10** (timer), num repo local:
+
+| Etapa | Tempo | Custo | Resultado |
+|---|---|---|---|
+| spec | 99 s | US$ 0,77 | 4 tabelas, regras, 3 actions e plano de testes com casos de fronteira (59.999 ms contra 60.000 ms, 23h30 em São Paulo) |
+| dev (2 rodadas) | 460 s | US$ 2,60 | 26 testes de unidade, migração, `/timer` com dados reais; a rastreabilidade **reprova** (0/4), como planejado |
+| testes | 139 s | US$ 0,87 | 4/4 ACs com teste Playwright passando; rastreabilidade OK |
+
+**O que deu errado / surpreendeu:**
+- **O Vitest 5 exige `@types/node` 22 ou mais, e o template do Next traz a versão 20.** O `npm install` quebrou com ERESOLVE. O `ensure tests` agora atualiza para a versão 24.
+- **A rota de reset não compilava com tabelas reais** (type predicate do Drizzle). O build quebrou e o Playwright ficou sem servidor. O app de prova pegou isso antes de virar problema de quem assiste.
+- **A skill de dev não podia apagar arquivo.** A Técnica mandava remover o mock e `git rm`, `rm` e `Remove-Item` foram todos negados, então a skill parou e pediu aprovação. Agora as skills de código liberam `git rm` e dizem que ele é o caminho.
+- A skill de testes tentou corrigir o teste com `sed`, que pede aprovação. As skills agora dizem para editar só com Edit/Write.
+- **O modelo leu a documentação do Next dentro do `node_modules`** (graças ao `AGENTS.md`). Usou `retry()` no `error.tsx`, que é a recomendação da versão instalada, e percebeu que o driver HTTP do Neon não tem transação: resolveu parar o timer e gravar o registro num único comando SQL atômico. Os dois desvios foram registrados em "Notas de implementação".
+- O primeiro teste de aceite falhou por causa do próprio teste (o texto do seletor incluía o ícone "▼"), não do app. A skill distinguiu os dois casos, como o texto dela pede.
+
+**Decisões:**
+- PGlite em dev, testes e CI (zero infraestrutura, reproduzível por quem assiste); Neon só em preview e produção (F4).
+- O dev abre o PR com o CI **vermelho de propósito**, e o `/esteira:testes` o deixa verde. Isso é o gancho entre o Ep7 e o Ep8.
+
+**Revisão independente da F3:** achou 10 problemas. Todos foram corrigidos com teste de regressão e revalidados no app real da story #10.
+
+| # | Gravidade | Bug | Correção |
+|---|---|---|---|
+| 1 | Alta | **O reset dos testes podia zerar o Neon.** Com um `DATABASE_URL` no `.env.local` (`vercel env pull`), o `npm run test:e2e` faria `TRUNCATE` no banco remoto a cada teste | Com `E2E=1` é sempre PGlite em memória; a rota recusa (403) se houver `DATABASE_URL`/`VERCEL_ENV`; testado com os servidores de verdade |
+| 2 | Alta | **A rastreabilidade podia passar sem testes**: teste comentado contava, `describe.skip` contava, BOM ou aspas no `status` tiravam a spec da cobrança, spec em dev sem AC passava com 0/0 | Remoção de comentários preservando strings e templates, escopo de `describe.skip/fixme` e de `test.skip()` no corpo, `status` normalizado e validado, 0 AC falha |
+| 3 | Média | Story só de UI quebrava o `npm run test` (Vitest sem testes = exit 1) | `passWithNoTests` |
+| 4 | Média | Transação passava no PGlite e quebraria no Neon via HTTP | O banco local bloqueia `transaction()` (paridade); skills mandam usar um comando SQL atômico; a migração do Neon fica para a F4 |
+| 5 | Média | Um 404 da rota de reset seguia com dados sujos (servidor sem `E2E=1` reaproveitado, preview) | A rota responde 403 fora do E2E e o teste falha; `E2E_NO_RESET=1` só de propósito |
+| 6 | Média | Uma conexão que falhou ficava em cache até reiniciar | O cache é limpo na falha |
+| 7 | Média | Specs sem `status` (anteriores à F3) eram lidas como `backlog` e a skill pedia a etapa anterior em loop | `status` ausente = null, e as skills caem para o estágio das labels |
+| 8 | Baixa | `drizzle-kit generate` pergunta de forma interativa em renomeações e trava | A skill de dev só acrescenta e explica como lidar |
+| 9 | Baixa | O `TRUNCATE` ignorava `pgSchema` | Usa `getTableConfig` |
+| 10 | Baixa | `hasAcceptanceTests` contava comentário; `next.config` em `export default`/`.mjs` não era aceito, e a falha deixava o repo pela metade; `--closes abc` virava `#NaN` | Só título de `test()`; mais formatos e validação **antes** de escrever; números validados |
+
+**Bug meu durante as correções:** editei o `status.mjs` com `String.replace(from, to)`, e o texto novo tinha `` $` ``, que no JavaScript significa "tudo o que vem antes do trecho". O arquivo inteiro foi colado no meio de uma função. Restaurei do git e passei a usar `replace(from, () => to)` em todas as edições por script.

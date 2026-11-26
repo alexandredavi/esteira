@@ -150,3 +150,25 @@ test("revisão: revisar um gate aberto a partir da main reaproveita o branch", (
   assert.equal(sh(dir, "log", "-1", "--format=%s"), "v2");
   assert.equal(sh(dir, "stash", "list"), "");
 });
+
+test("F3: --closes põe Closes #n no topo do corpo (PR de dev ligado à story)", () => {
+  const body = buildBody({ stage: "dev", stories: [], summary: "x", closes: [12, 13] });
+  assert.match(body, /^Closes #12\nCloses #13\n\n## Gate: dev/);
+});
+
+test("F3: --allow-missing ignora caminhos inexistentes (PR de dev com caminhos opcionais)", () => {
+  const { dir } = productRepo({ remote: false });
+  const path = writeArtifact(dir, "src/app/x.tsx");
+  const r = openGate({ cwd: dir, stage: "dev", branch: "feat/12-x", title: "feat(#12): x", paths: `${path},drizzle,e2e`, "allow-missing": true, closes: "12" });
+  assert.equal(r.ok, true, r.error);
+  assert.deepEqual(r.paths, [path]);
+  assert.equal(openGate({ cwd: dir, stage: "dev", branch: "feat/12-x", title: "t", paths: "drizzle" }).ok, false);
+  assert.equal(openGate({ cwd: dir, stage: "dev", branch: "feat/12-x", title: "t", paths: "drizzle", "allow-missing": true }).ok, false, "precisa de pelo menos um caminho");
+});
+
+test("revisão F3: --closes e --stories só aceitam números", () => {
+  const { dir } = productRepo({ remote: false });
+  const path = writeArtifact(dir);
+  assert.match(openGate({ cwd: dir, stage: "dev", branch: "feat/1-x", title: "t", paths: path, closes: "abc" }).error, /só números/);
+  assert.match(openGate({ cwd: dir, stage: "spec", branch: "docs/x", title: "t", paths: path, stories: "12,x" }).error, /só números/);
+});

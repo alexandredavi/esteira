@@ -341,6 +341,7 @@ Não decididos na sessão de design; resolver durante F0–F6 e registrar no bui
 - ~~Onde nasce o app~~ → **resolvido na F2**: `/esteira:setup` (Ep0) monta Next.js + shadcn com versões fixadas (create-next-app 16.4.6, shadcn 4.23.1); o status pede o setup antes de tudo.
 - ~~Onde o discovery busca concorrentes~~ → **resolvido na F1**: o subagente `esteira:pm` usa WebSearch/WebFetch; sem web, marca a fonte como "conhecimento do modelo — validar" e nunca inventa URL.
 - Issues órfãs se o PR do backlog for fechado sem merge (as issues são criadas antes do PR, porque os números entram nos IDs dos ACs).
-- Formato exato do check de rastreabilidade (script Node no CI vs. ação reutilizável publicada no repo `esteira`).
+- ~~Formato do check de rastreabilidade~~ → **resolvido na F3**: script Node sem dependências copiado para o produto (`scripts/esteira/traceability.mjs`, via `ensure tests`). Exige teste para todo AC das specs com `status: dev|done`; `test.skip` não conta.
 - Estratégia de rollback no deploy (Vercel instant rollback + migrations reversíveis).
-- Seeds de dados para previews e para os testes E2E.
+- ~~Dados dos testes E2E~~ → **resolvido na F3**: banco PGlite em memória no servidor de teste, zerado antes de cada teste (`/api/e2e/reset`, só com `E2E=1`); o "Dado" é preparado pela UI ou pelo relógio do Playwright. Seeds de preview continuam abertos (F4).
+- **Estado da story no git (F3):** o frontmatter da spec tem `status` (backlog → design → spec → dev → done), atualizado por cada etapa e aprovado junto com o PR. Funciona sem GitHub e é o que a rastreabilidade lê.
