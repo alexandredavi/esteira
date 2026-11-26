@@ -169,8 +169,12 @@ test("dry-run F5: piloto v1 e v2 são atualizados; o atual libera só o bot gith
   assert.doesNotMatch(wf, /allowed_bots: "\*"|allowed_bots: \*/);
   assert.match(wf, /ESTEIRA_PILOTO_TOKEN/);
   assert.match(wf, /name: Esperar o CI do PR[\s\S]*name: Review/);
-  const v2 = readFileSync(new URL("../templates/app/workflows/legacy/esteira-piloto-v2.yml", import.meta.url), "utf8");
-  writeFileSync(join(dir, ".github/workflows/esteira-piloto.yml"), v2);
-  ensure("piloto", { cwd: dir, "skip-install": true });
-  assert.match(read(dir, ".github/workflows/esteira-piloto.yml"), /ESTEIRA_PILOTO_TOKEN/);
+  for (const v of ["esteira-piloto-v2.yml", "esteira-piloto-v3.yml"]) {
+    writeFileSync(join(dir, ".github/workflows/esteira-piloto.yml"), readFileSync(new URL("../templates/app/workflows/legacy/" + v, import.meta.url), "utf8"));
+    ensure("piloto", { cwd: dir, "skip-install": true });
+    const cur = read(dir, ".github/workflows/esteira-piloto.yml");
+    assert.match(cur, /steps.pre.outputs.skip/, v);
+    // o token nunca fica no env do job inteiro (npm ci, dependências)
+    assert.ok(!cur.split("steps:")[0].includes("secrets.ESTEIRA_PILOTO_TOKEN"), `${v}: token no env do job`);
+  }
 });

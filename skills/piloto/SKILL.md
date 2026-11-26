@@ -2,7 +2,7 @@
 name: piloto
 description: Piloto automático da esteira (episódio 12). Instala no produto um workflow do GitHub Actions que, quando uma story fica pronta para dev (spec aprovada), roda sozinho /esteira:dev → /esteira:testes → /esteira:review, cada etapa numa sessão nova do Claude Code, e para no comentário de review do PR (o merge continua humano). Também dispara o piloto para uma story à mão e mostra as execuções. Use quando a pessoa disser "/esteira:piloto", "ligar o piloto automático", "rodar a story #N no Actions", ou no episódio 12.
 argument-hint: "[número da story para disparar | status] — padrão: instalar/verificar"
-allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/ensure.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Bash(gh secret list *) Bash(gh workflow run esteira-piloto.yml *) Bash(gh run list *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/ensure.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(gh secret list *) PowerShell(gh workflow run esteira-piloto.yml *) PowerShell(gh run list *) Read Glob
+allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/ensure.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/piloto-check.mjs *) Bash(gh workflow run esteira-piloto.yml *) Bash(gh run list *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/ensure.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/piloto-check.mjs *) PowerShell(gh workflow run esteira-piloto.yml *) PowerShell(gh run list *) Read Glob
 ---
 
 # /esteira:piloto
@@ -22,6 +22,7 @@ Rode `gh run list --workflow esteira-piloto.yml --limit 5` e mostre uma tabela: 
 ## `<número>` — disparar para uma story
 
 1. `node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs .`: a story precisa estar `ready-for-dev` em `stories[]`, ou ter `status: spec` em `specs[]`. Se não estiver, diga qual etapa falta e pare.
+   `node ${CLAUDE_PLUGIN_ROOT}/scripts/piloto-check.mjs .`: se `main-exige-pr` ou `sem-bypass` falharem, **não dispare**. Explique o risco e o `comoCorrigir`.
 2. `gh workflow run esteira-piloto.yml -f story=<número>`
 3. `gh run list --workflow esteira-piloto.yml --limit 1`: mostre o link da execução.
 
@@ -53,15 +54,19 @@ Se `changed` não estiver vazio, abra o gate:
 node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs --stage piloto --branch chore/piloto --allow-missing --title "chore(piloto): piloto automático no GitHub Actions" --paths .github/workflows --summary "<resumo sem aspas duplas, crases nem $>"
 ```
 
-### 3. Secrets (a pessoa faz)
+### 3. Conferir (a pessoa configura)
 
-Rode `gh secret list` (só mostra **nomes**, nunca valores). **A pessoa** cria os secrets em *Settings → Secrets and variables → Actions*; você nunca pede, lê nem grava chave ou token.
+Rode `node ${CLAUDE_PLUGIN_ROOT}/scripts/piloto-check.mjs .`. Ele confere, sem mudar nada: a credencial do Claude, o token do piloto (só os **nomes** dos secrets) e se a **main exige PR, sem bypass**. Mostre cada check com `ok: false` e o `comoCorrigir`.
+
+**A main exigir PR é obrigatório antes de ligar o piloto.** O modelo trabalha com um token de escrita durante o dev e os testes. O que garante tecnicamente que ele não pula o gate humano (o merge) é a main não aceitar push direto de ninguém. Se `main-exige-pr` ou `sem-bypass` falharem, diga isso com clareza e recomende não disparar o piloto até a pessoa criar o ruleset.
+
+Os secrets: **A pessoa** cria os secrets em *Settings → Secrets and variables → Actions*; você nunca pede, lê nem grava chave ou token.
 
 **a) Token do piloto: `ESTEIRA_PILOTO_TOKEN` (recomendado).** Com ele, o push e o PR do piloto saem como a pessoa, e o **CI normal do PR roda e aparece nos checks**. Sem ele, o PR é aberto pelo bot do Actions, que não dispara o CI do PR; o piloto dispara o CI à mão, mas o resultado só aparece no Actions, não nos checks do PR. Para criar:
 
 1. github.com/settings/personal-access-tokens/new → *Fine-grained token*, com validade curta (ex.: 90 dias).
 2. *Repository access*: **só este repo**.
-3. *Permissions*: Contents, Pull requests, Issues e Workflows em **Read and write**.
+3. *Permissions*: Contents, Pull requests e Issues em **Read and write**. **Não** dê Workflows: o piloto não precisa, e um workflow novo poderia ler os secrets do repo.
 4. Salve como o secret `ESTEIRA_PILOTO_TOKEN`.
 
 **b) Credencial do Claude: uma das duas.**
@@ -76,7 +81,7 @@ Depois: *Settings → Secrets and variables → Actions → New repository secre
 Responda curto:
 
 - O que foi instalado (e o link do PR)
-- A credencial: presente ou faltando, e como criar
+- O resultado do `piloto-check`: credencial, token e a proteção da main
 - Como funciona:
   1. o merge do PR da spec aplica `ready-for-dev` e dispara o piloto;
   2. ele roda dev, testes e review;

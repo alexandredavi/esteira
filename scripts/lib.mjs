@@ -22,6 +22,8 @@ export function gh(cwd, ...args) {
   const [a, b] = args;
   if (a === "--version" || (a === "repo" && b === "view")) return { ok: true, out: '{"nameWithOwner":"fake/produto"}' };
   if (a === "pr" && b === "list") return { ok: true, out: process.env.ESTEIRA_FAKE_GH_PRS ?? "[]" };
+  if (a === "secret" && b === "list") return { ok: true, out: process.env.ESTEIRA_FAKE_GH_SECRETS ?? "[]" };
+  if (a === "repo" && b === "view" && args.join(" ").includes("defaultBranchRef")) return { ok: true, out: '{"nameWithOwner":"fake/produto","defaultBranchRef":{"name":"main"}}' };
   if (a === "api") {
     // ESTEIRA_FAKE_GH_API: JSON { "<caminho da api>": resposta }
     const routes = JSON.parse(process.env.ESTEIRA_FAKE_GH_API ?? "{}");

@@ -178,9 +178,9 @@ export function ensure(feature, opts = {}) {
     applyUpgrade(".github/workflows/esteira-gates.yml", upgradeGates);
     applyUpgrade(".github/workflows/esteira-piloto.yml", (cur) => upgradeWorkflow(cur, {
       latest: "esteira-piloto.yml",
-      legacy: ["esteira-piloto-v1.yml", "esteira-piloto-v2.yml"],
-      keepIf: (c) => c.includes("allowed_bots") && c.includes("ESTEIRA_PILOTO_TOKEN"),
-      note: "O esteira-piloto.yml foi customizado: compare com o template da esteira (allowed_bots: github-actions, ESTEIRA_PILOTO_TOKEN e a espera pelo CI antes do review).",
+      legacy: ["esteira-piloto-v1.yml", "esteira-piloto-v2.yml", "esteira-piloto-v3.yml"],
+      keepIf: (c) => c.includes("allowed_bots") && c.includes("ESTEIRA_PILOTO_TOKEN") && c.includes("steps.pre.outputs.skip"),
+      note: "O esteira-piloto.yml foi customizado: compare com o template da esteira (allowed_bots: github-actions, ESTEIRA_PILOTO_TOKEN só nos passos que precisam, pré-checagem da story e a espera pelo CI antes do review).",
     }));
   }
 
