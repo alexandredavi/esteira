@@ -11,6 +11,8 @@ Você publica uma versão do produto. Quem calcula a versão e escreve o `CHANGE
 
 > **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir`.
 
+> **Nunca edite os arquivos do plugin** (tudo em `${CLAUDE_PLUGIN_ROOT}`: scripts, templates e skills). Se um script da esteira falhar, mostre o erro e pare: quem corrige o plugin é quem o mantém, não a etapa.
+
 ## 0. Pré-checagem
 
 ```
@@ -42,6 +44,8 @@ Para cada check com `ok: false`, mostre o `comoCorrigir`. Mudar configuração d
 
 Depois do merge desse PR, o próximo push na `main` faz o release-please abrir o Release PR.
 
+A tag é `vX.Y.Z` (`include-component-in-tag: false`). Um repo que já tenha releases com tag `app-vX.Y.Z` (config antiga) mantém a config dele: o `ensure` não sobrescreve. Trocar o formato no meio do histórico faria o release-please não achar a release anterior.
+
 ## 2. Mostrar a próxima versão
 
 ```
@@ -49,7 +53,7 @@ gh pr list --state open --label "autorelease: pending" --json number,title,url,b
 gh release list --limit 3
 ```
 
-- **Há Release PR** → mostre a versão (no título), as seções do changelog do corpo (Novidades, Correções…) e o link.
+- **Há Release PR** → mostre a versão (no título), as seções do changelog do corpo (Novidades, Correções…) e o link. Avise que ele **não roda CI**: PRs abertos pelo `GITHUB_TOKEN` não disparam workflows (limitação do GitHub). Isso é esperado, porque ele só muda a versão e o `CHANGELOG.md`; o código que entra na versão já passou pelo CI nos PRs das stories.
 - **Não há** → olhe `git log <última tag>..HEAD --oneline` (`git tag --sort=-v:refname` lista as tags, a mais nova primeiro). Se houver `feat:` ou `fix:` depois da tag e o workflow já estiver instalado, o Release PR deve aparecer em instantes, depois do push na `main`. Se só houver `docs:`/`chore:` (discovery, PRD, backlog, specs, protótipos e DS usam esses tipos), não há versão nova: quem sobe versão é `feat` (story implementada) ou `fix`.
 - Commits que não seguem o padrão (sem `tipo:`) não entram no changelog. Liste-os, se houver, para a pessoa saber.
 

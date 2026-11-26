@@ -226,3 +226,53 @@ Conferi as telas no navegador: o timer conta de verdade, e a vitrine mostra os d
 | 5 | Média | Com merge commit (o padrão do GitHub), os commits dos gates entram na `main` e o changelog repete entradas da mesma story | `release-check.mjs` confere squash-only com o título do PR, e as permissões do workflow, e diz como corrigir sem mudar nada sozinho |
 | 6 | Média | O `gh api repos/{owner}/...` quebra no PowerShell 5.1 (`{owner}` vira script block), e `git tag *` liberava apagar tags | A checagem foi para um script Node; o `git tag` ficou só leitura |
 | 7 | Baixa | O status lia só os 50 deploys mais recentes; produção ou o preview de um PR antigo sumiam | Consultas filtradas por ambiente e por branch |
+
+## 2026-11-26 — F6 — Dry-run com GitHub, Vercel e Neon de verdade
+
+**O que fiz:** um produto descartável e público, [esteira-dryrun](https://github.com/alexandredavi/esteira-dryrun) (o "Pauta", uma lista de tarefas do dia), passou pela esteira inteira com 1 story, cada etapa num `claude -p` novo, e eu mergeando os gates depois do CI verde:
+
+| Etapa | Tempo | Custo | O que o mundo real confirmou |
+|---|---|---|---|
+| setup | 191 s | US$ 0,46 | CI do produto verde no GitHub Actions |
+| discovery | 120 s | US$ 0,87 | Pesquisa de concorrentes com fonte (Todoist, To Do, Google Tasks, Tweek) |
+| PRD | 89 s | US$ 0,59 | 4 capacidades |
+| backlog | 176 s | US$ 0,88 | **4 épicos e 11 stories como issues reais**, com labels |
+| design system | 136 s | US$ 0,95 | Todos os pares AA |
+| protótipo #8 | 220 s | US$ 1,03 | No merge, o workflow `esteira-gates` **aplicou `design:approved` sozinho** |
+| spec #8 | 113 s | US$ 0,80 | No merge, `spec:approved` e `ready-for-dev` sozinhos |
+| dev #8 | 220 s | US$ 1,42 | O CI **reprovou exatamente na rastreabilidade (0/4)**; tudo antes dela verde |
+| testes #8 | 92 s | US$ 0,71 | CI verde com Playwright no Ubuntu; o status sugeria `/esteira:testes` antes do review |
+| review #8 | 100 s | US$ 0,97 | Comentário publicado no PR; 1 achado importante, nada bloqueando |
+| merge | — | — | **A issue #8 fechou sozinha** (`Closes #8`) |
+| deploy | 62 s | US$ 0,45 | Build da Vercel: `[esteira] migrações aplicadas` no **Neon** (produção e preview com branch próprio); tarefa anotada em produção sobreviveu ao reload |
+| release | 48 s | US$ 0,46 | O release-please abriu o Release PR sozinho; no merge, **release v0.2.0** e `CHANGELOG.md` em PT-BR só com a story |
+
+**Total:** cerca de US$ 11 e 30 minutos de etapas, para levar uma story da ideia à produção versionada.
+
+**Achados que só o mundo real mostrou (9), todos corrigidos:**
+1. O setup listava o `next-env.d.ts` (que o `.gitignore` do Next ignora) e o `git add` do gate quebrava. Agora o gate descarta os caminhos ignorados.
+2. **Ao bater num script quebrado, a skill tentou editar o próprio plugin.** Todas as skills agora proíbem isso: mostram o erro e param.
+3. O DS tentou `git checkout -b` e copiar o template com `node -e` (negados; ele se recuperou sozinho).
+4. O `page.clock` do Playwright **não alcança o servidor**. A orientação de spec e testes foi corrigida: tempo calculado no servidor se testa em unidade.
+5. **O resultado de um subagente chega num turno seguinte, em que os `allowed-tools` da skill já não valem.** O review não conseguiu publicar. Review e discovery agora trabalham no próprio turno, com o checklist do agente, e a independência vem de rodar numa sessão nova.
+6. (Achado pelo próprio `/esteira:review`) Sem `DATABASE_URL` na Vercel, o app caía em silêncio num banco em memória. Agora falha com mensagem clara.
+7. **A Vercel não usa a API de Deployments do GitHub:** ela reporta um commit status "Vercel" e a URL do preview no comentário do bot. O `deploy-status.mjs` foi reescrito com os formatos reais.
+8. O Release PR não roda CI (PR aberto pelo `GITHUB_TOKEN` não dispara workflows). Agora a skill avisa.
+9. A tag saiu `app-v0.2.0`, porque o pacote herdou o nome `app` da pasta temporária do setup. O setup passa a usar o nome do repo, e a config deixa de pôr o componente na tag.
+
+**Eu errei duas vezes, e o diário registra:**
+- De novo um `\n` atravessando heredoc, JS e substituição virou quebra de linha real e deixou o `gate.mjs` com erro de sintaxe **enquanto o discovery do dry-run usava o plugin**. Corrigi em um minuto.
+- Usei `git commit -am` no dry-run e levei junto uma linha que o `vercel link` tinha posto no `.gitignore`.
+
+**Configuração feita por mim, com o OK do Alexandre:** repo público, só squash merge com o título do PR, permissões do Actions, `ESTEIRA_MIGRATE=1` (Production e Preview, porque o Neon cria um branch por preview) e o redeploy. Primeiro foi preciso descobrir que o redeploy inicial tinha **pulado** a migração: a trava funcionou como projetado.
+
+**Revisão independente das correções da F6:** achou 6 problemas, todos corrigidos com teste:
+
+| # | Problema | Correção |
+|---|---|---|
+| 1 | A minha correção 6 (falhar sem `DATABASE_URL` na Vercel) **quebraria os previews dos PRs de dev**, que vêm antes de o Neon ser conectado, e o dev local depois de um `vercel env pull` (`VERCEL_ENV=development`) | Falha só em **produção** |
+| 2 | O preview era buscado pelo nome do branch, e um PR de fork com branch `main` mostraria a produção | Busca pelo SHA do head |
+| 3 | O status "Vercel Preview Comments", sempre verde, podia mascarar um deploy que falhou | Contexto exato "Vercel" |
+| 4 | O filtro de caminhos ignorados rodava depois do stash, ao reabrir o gate, e deixava stash e index sujos | O filtro roda antes de qualquer mudança no repo, sem aspas em caminho com acento |
+| 5 | Ao retomar um setup que falhou, o pacote continuava `app` | Renomeia sempre que o nome é `app` |
+| 6 | Repos com releases `app-vX` perderiam a referência se o formato da tag mudasse | O `ensure` não sobrescreve a config, e a skill explica |

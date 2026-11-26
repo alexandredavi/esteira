@@ -129,3 +129,8 @@ test("F4: ensure release — workflow, config e manifest com a versão do app", 
   assert.deepEqual(JSON.parse(read(dir, ".release-please-manifest.json")), { ".": "0.3.0" });
   assert.ok(r.paths.includes(".release-please-manifest.json"));
 });
+
+test("dry-run F6: release-please sem prefixo de componente na tag (v0.2.0, não app-v0.2.0)", () => {
+  const cfg = JSON.parse(readFileSync(new URL("../templates/app/release-please-config.json", import.meta.url), "utf8"));
+  assert.equal(cfg.packages["."]["include-component-in-tag"], false);
+});

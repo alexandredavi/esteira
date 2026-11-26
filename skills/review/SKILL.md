@@ -1,17 +1,23 @@
 ---
 name: review
-description: Etapa de review da esteira. Revisa o PR de uma story com um subagente revisor sem contexto de quem escreveu (spec × código, dados, segurança, testes de aceite, DS, Next 16), confere o CI e a rastreabilidade, publica o resultado como comentário de review no PR e devolve a decisão de merge para a pessoa (o gate humano). Use quando a pessoa disser "/esteira:review", "revisar o PR #N", ou quando o /esteira:status indicar esta etapa.
+description: Etapa de review da esteira. Revisa o PR de uma story numa sessão sem contexto de quem escreveu, com o checklist do revisor da esteira (spec × código, dados, segurança, testes de aceite, DS, Next 16), confere o CI e a rastreabilidade, publica o resultado como comentário de review no PR e devolve a decisão de merge para a pessoa (o gate humano). Use quando a pessoa disser "/esteira:review", "revisar o PR #N", ou quando o /esteira:status indicar esta etapa.
 argument-hint: "[número do PR — padrão: o PR da story em review]"
-allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(gh pr view *) Bash(gh pr checks *) Bash(gh pr review *) Bash(git diff *) Bash(git log *) Bash(npm run *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(gh pr view *) PowerShell(gh pr checks *) PowerShell(gh pr review *) PowerShell(git diff *) PowerShell(git log *) PowerShell(npm run *) Read Write Glob Grep Agent
+allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(gh pr view *) Bash(gh pr checks *) Bash(gh pr review *) Bash(git diff *) Bash(git log *) Bash(git show *) Bash(npm run *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(gh pr view *) PowerShell(gh pr checks *) PowerShell(gh pr review *) PowerShell(git diff *) PowerShell(git log *) PowerShell(git show *) PowerShell(npm run *) Read Write Glob Grep
 ---
 
 # /esteira:review
 
-Você coordena a revisão do PR de uma story. A revisão em si é feita pelo subagente **`esteira:reviewer`**, que não viu o código ser escrito. Uma revisão independente acha o que quem escreveu não vê. Você **não aprova nem mergeia**: isso é o gate humano. Responda sempre em PT-BR.
+Você revisa o PR de uma story **sem ter escrito o código**. Uma revisão independente acha o que quem escreveu não vê.
+
+> **Independência:** rode o `/esteira:review` numa **sessão nova** do Claude Code (outra janela, ou `/clear` antes), nunca na mesma conversa que implementou a story. Se esta conversa escreveu o código do PR, diga isso e peça para rodar numa sessão nova: não revise.
+>
+> A revisão é feita **por você, neste turno**, e não por um subagente. O resultado de um subagente chega num turno seguinte, em que as permissões desta skill já não valem, e o review não seria publicado. Você **não aprova nem mergeia**: isso é o gate humano. Responda sempre em PT-BR.
 
 PR pedido: `$ARGUMENTS`
 
 > **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir`. Comandos compostos pedem aprovação e travam a etapa. Para escrever arquivo, use a ferramenta Write.
+
+> **Nunca edite os arquivos do plugin** (tudo em `${CLAUDE_PLUGIN_ROOT}`: scripts, templates e skills). Se um script da esteira falhar, mostre o erro e pare: quem corrige o plugin é quem o mantém, não a etapa.
 
 ## 0. Pré-checagem
 
@@ -36,9 +42,9 @@ npm run test
 
 Anote o resultado de cada uma. O CI do PR (`gh pr checks`) é a fonte para o build e os testes de aceite. Localmente eles são lentos e já rodam lá.
 
-## 2. Revisão independente
+## 2. Revisão
 
-Delegue ao subagente **`esteira:reviewer`** (ferramenta Agent). Passe **só** o número da story, o caminho da spec e o comando do diff, `git diff origin/<padrão>...HEAD` (sem remoto: `git diff <padrão>...HEAD`). **Não** passe a sua opinião nem um resumo do código: a revisão precisa ser independente.
+Leia com a ferramenta **Read** o checklist do revisor em `${CLAUDE_PLUGIN_ROOT}/agents/reviewer.md` e siga-o à risca: o que verificar, a gravidade e o formato da saída (tabela de achados, "Conferido e ok", veredito). O código a revisar é o diff `git diff origin/<padrão>...HEAD` (sem remoto: `git diff <padrão>...HEAD`) e os arquivos que ele toca. Revise **o que está commitado**: mudanças não commitadas no working tree não fazem parte do PR.
 
 ## 3. Publicar
 
@@ -53,10 +59,10 @@ Escreva `.esteira/review-<PR ou branch>.md` com a ferramenta Write (no nome do b
 | Rastreabilidade | ✅ <x/x ACs> / ❌ |
 | Lint · tipos · unidade | ✅ / ❌ |
 
-<a tabela de achados, o "Conferido e ok" e o veredito do subagente, sem editar o conteúdo>
+<a tabela de achados, o "Conferido e ok" e o veredito>
 
 ---
-Revisão por IA (subagente sem contexto de quem escreveu). **A decisão de merge é humana.**
+Revisão por IA, numa sessão sem contexto de quem escreveu. **A decisão de merge é humana.**
 ```
 
 Com GitHub, publique como **comentário de review** (o autor do PR não pode aprovar nem pedir mudanças no próprio PR, então é sempre `--comment`):

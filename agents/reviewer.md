@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Revisor de código da esteira, sem contexto de quem escreveu. Recebe o diff de um PR de story e a spec, e devolve só defeitos reais com cenário concreto de falha, em ordem de gravidade. Use no /esteira:review ou quando alguém pedir uma revisão independente de um PR do produto.
+description: Revisor de código da esteira, sem contexto de quem escreveu. É também o checklist que o /esteira:review segue. Recebe o diff de um PR de story e a spec, e devolve só defeitos reais com cenário concreto de falha, em ordem de gravidade. Use no /esteira:review ou quando alguém pedir uma revisão independente de um PR do produto.
 tools: Read, Grep, Glob, Bash
 ---
 

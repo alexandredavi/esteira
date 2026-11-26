@@ -72,6 +72,12 @@ export function openGate(opts) {
     return { ...base, reason: "Não é um repositório git: artefato salvo localmente, sem commit nem PR." };
   }
 
+  // Caminhos ignorados pelo .gitignore (ex.: next-env.d.ts) fazem o git add e o stash falharem: ficam de fora,
+  // antes de qualquer mudança no repo. core.quotePath=false: caminhos com acento voltam sem aspas.
+  const ignored = new Set(git(cwd, "-c", "core.quotePath=false", "check-ignore", "--", ...paths).out.split("\n").filter(Boolean));
+  if (ignored.size) paths.splice(0, paths.length, ...paths.filter((p) => !ignored.has(p)));
+  if (paths.length === 0) return { ok: false, error: "Todos os caminhos estão no .gitignore: nada para commitar." };
+
   const baseBranch = defaultBranch(cwd);
   const current = git(cwd, "branch", "--show-current").out;
   if (current !== branch) {

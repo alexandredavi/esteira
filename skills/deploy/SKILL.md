@@ -13,6 +13,8 @@ Pedido: `$ARGUMENTS`
 
 > **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir`. Para mudar arquivo, use a ferramenta Edit.
 
+> **Nunca edite os arquivos do plugin** (tudo em `${CLAUDE_PLUGIN_ROOT}`: scripts, templates e skills). Se um script da esteira falhar, mostre o erro e pare: quem corrige o plugin é quem o mantém, não a etapa.
+
 ## `status` — só mostrar
 
 Rode `node ${CLAUDE_PLUGIN_ROOT}/scripts/deploy-status.mjs` e mostre:

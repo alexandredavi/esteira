@@ -13,6 +13,8 @@ Stories pedidas: `$ARGUMENTS`
 
 > **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir` (a ferramenta Write já cria as pastas). Comandos compostos pedem aprovação e travam a etapa. Para mudar arquivo, use a ferramenta Edit ou Write, nunca `sed`, `awk` ou redirecionamento. Para apagar um arquivo, use `git rm <caminho>`: é o único comando de remoção liberado (`rm` e `Remove-Item` pedem aprovação).
 
+> **Nunca edite os arquivos do plugin** (tudo em `${CLAUDE_PLUGIN_ROOT}`: scripts, templates e skills). Se um script da esteira falhar, mostre o erro e pare: quem corrige o plugin é quem o mantém, não a etapa.
+
 ## 0. Pré-checagem
 
 Rode com a ferramenta **Bash**, nesta ordem:

@@ -9,6 +9,8 @@ allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(
 
 Mostre o estado da esteira no repo do produto e o próximo passo. Esta skill **só lê**: não cria arquivos, issues, labels nem PRs.
 
+> **Nunca edite os arquivos do plugin** (tudo em `${CLAUDE_PLUGIN_ROOT}`: scripts, templates e skills). Se um script da esteira falhar, mostre o erro e pare: quem corrige o plugin é quem o mantém, não a etapa.
+
 ## 1. Coletar
 
 Rode exatamente este comando, com a ferramenta **Bash** (também funciona no Windows via Git Bash), sem prefixos nem `cd`:

@@ -27,7 +27,7 @@ Os comandos ficam sob o namespace do plugin: `/esteira:status`, `/esteira:discov
 | `/esteira:spec` | Seção Técnica: modelo de dados, regras, contratos, troca dos mocks, plano de testes por AC | `docs/specs/<issue>-<slug>.md` |
 | `/esteira:dev` | Implementa a Técnica: schema + migração, regras com testes de unidade, server actions, mocks → dados reais | PR `Closes #<issue>` |
 | `/esteira:testes` | Cada AC em Gherkin vira um teste Playwright com o ID no título; a rastreabilidade do CI exige todos | `e2e/<issue>-<slug>.spec.ts` |
-| `/esteira:review` | Revisão por um subagente sem contexto de quem escreveu (spec × código, dados, segurança, testes, DS) + CI e rastreabilidade; o merge é seu | Comentário de review no PR |
+| `/esteira:review` | Revisão numa sessão nova, sem contexto de quem escreveu, com o checklist do revisor (spec × código, dados, segurança, testes, DS) + CI e rastreabilidade; o merge é seu | Comentário de review no PR |
 | `/esteira:deploy` | Migração do banco no build da Vercel (só com `ESTEIRA_MIGRATE=1`), runbook, estado dos deploys e rollback | `docs/deploy.md` |
 | `/esteira:release` | release-please: versão e changelog em PT-BR a partir dos títulos dos PRs; o merge do Release PR é seu | `CHANGELOG.md` + tag |
 | `/esteira:status` | Status: o que está em cada etapa e o próximo passo | — |

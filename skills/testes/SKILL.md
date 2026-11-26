@@ -13,6 +13,8 @@ Story pedida: `$ARGUMENTS`
 
 > **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir` (a ferramenta Write já cria as pastas). Comandos compostos pedem aprovação e travam a etapa. Para mudar arquivo, use a ferramenta Edit ou Write, nunca `sed`, `awk` ou redirecionamento. Para apagar um arquivo, use `git rm <caminho>`: é o único comando de remoção liberado (`rm` e `Remove-Item` pedem aprovação).
 
+> **Nunca edite os arquivos do plugin** (tudo em `${CLAUDE_PLUGIN_ROOT}`: scripts, templates e skills). Se um script da esteira falhar, mostre o erro e pare: quem corrige o plugin é quem o mantém, não a etapa.
+
 ## 0. Pré-checagem
 
 1. Rode `node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs .` com a ferramenta **Bash**. A story é o número em `$ARGUMENTS`, ou a story em `in-review` em `stories[]`.
@@ -44,7 +46,7 @@ Regras:
 - **Um `test(...)` por AC**, com o ID e o título exatos da spec. `test.skip` e `test.fixme` **não contam** na rastreabilidade.
 - Cada passo Gherkin vira um comentário seguido do código que o executa. O teste diz o que o critério diz, sem verificar a mais nem a menos.
 - **Seletores acessíveis**: `getByRole`, `getByLabel`, `getByText`. `data-testid` só em último caso, e aí acrescente o atributo no componente.
-- **"Dado" pela UI**: crie os dados pela própria interface, como o Plano de testes manda. Para tempo, use o relógio do Playwright (`await page.clock.install()`, `page.clock.fastForward("45:00")`). Sem acesso direto ao banco.
+- **"Dado" pela UI**: crie os dados pela própria interface, como o Plano de testes manda. Para tempo **no navegador**, use o relógio do Playwright (`await page.clock.install()`, `page.clock.fastForward("45:00")`). Ele **não** muda a hora do servidor: se o critério depende de tempo calculado no servidor, o teste de aceite usa a hora real (e calcula o esperado no próprio teste), e a regra fica coberta pelos testes de unidade, como o Plano de testes manda. Sem acesso direto ao banco.
 - Sem `waitForTimeout`: espere por estado visível (`expect(...).toBeVisible()`).
 
 ## 2. Rodar até ficar verde
