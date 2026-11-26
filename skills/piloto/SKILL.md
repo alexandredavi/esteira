@@ -53,9 +53,18 @@ Se `changed` não estiver vazio, abra o gate:
 node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs --stage piloto --branch chore/piloto --allow-missing --title "chore(piloto): piloto automático no GitHub Actions" --paths .github/workflows --summary "<resumo sem aspas duplas, crases nem $>"
 ```
 
-### 3. Credencial (a pessoa faz)
+### 3. Secrets (a pessoa faz)
 
-Rode `gh secret list` (só mostra **nomes**, nunca valores) e veja se existe `ANTHROPIC_API_KEY` ou `CLAUDE_CODE_OAUTH_TOKEN`. Se não existir nenhum, explique as duas opções. **A pessoa** cria o secret; você nunca pede, lê nem grava chave.
+Rode `gh secret list` (só mostra **nomes**, nunca valores). **A pessoa** cria os secrets em *Settings → Secrets and variables → Actions*; você nunca pede, lê nem grava chave ou token.
+
+**a) Token do piloto: `ESTEIRA_PILOTO_TOKEN` (recomendado).** Com ele, o push e o PR do piloto saem como a pessoa, e o **CI normal do PR roda e aparece nos checks**. Sem ele, o PR é aberto pelo bot do Actions, que não dispara o CI do PR; o piloto dispara o CI à mão, mas o resultado só aparece no Actions, não nos checks do PR. Para criar:
+
+1. github.com/settings/personal-access-tokens/new → *Fine-grained token*, com validade curta (ex.: 90 dias).
+2. *Repository access*: **só este repo**.
+3. *Permissions*: Contents, Pull requests, Issues e Workflows em **Read and write**.
+4. Salve como o secret `ESTEIRA_PILOTO_TOKEN`.
+
+**b) Credencial do Claude: uma das duas.**
 
 - **`ANTHROPIC_API_KEY`**: uma API key do console da Anthropic, **com limite de gasto** configurado. Cada story custa, em ordem de grandeza, de US$ 3 a 6 (dev, testes e review).
 - **`CLAUDE_CODE_OAUTH_TOKEN`**: usa a assinatura do Claude. Gere com `claude setup-token` no terminal.

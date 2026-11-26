@@ -158,7 +158,7 @@ test("F5: gates e CI customizados não são sobrescritos (só aviso)", () => {
   assert.equal(r.notes.length, 2);
 });
 
-test("dry-run F5: piloto v1 (sem allowed_bots) é atualizado; o atual libera só o bot github-actions", () => {
+test("dry-run F5: piloto v1 e v2 são atualizados; o atual libera só o bot github-actions e usa o token do piloto", () => {
   const dir = app();
   const v1 = readFileSync(new URL("../templates/app/workflows/legacy/esteira-piloto-v1.yml", import.meta.url), "utf8");
   writeFileSync(join(dir, ".github/workflows/esteira-piloto.yml"), v1);
@@ -167,4 +167,10 @@ test("dry-run F5: piloto v1 (sem allowed_bots) é atualizado; o atual libera só
   const wf = read(dir, ".github/workflows/esteira-piloto.yml");
   assert.equal((wf.match(/allowed_bots: github-actions/g) || []).length, 3);
   assert.doesNotMatch(wf, /allowed_bots: "\*"|allowed_bots: \*/);
+  assert.match(wf, /ESTEIRA_PILOTO_TOKEN/);
+  assert.match(wf, /name: Esperar o CI do PR[\s\S]*name: Review/);
+  const v2 = readFileSync(new URL("../templates/app/workflows/legacy/esteira-piloto-v2.yml", import.meta.url), "utf8");
+  writeFileSync(join(dir, ".github/workflows/esteira-piloto.yml"), v2);
+  ensure("piloto", { cwd: dir, "skip-install": true });
+  assert.match(read(dir, ".github/workflows/esteira-piloto.yml"), /ESTEIRA_PILOTO_TOKEN/);
 });
