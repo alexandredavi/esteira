@@ -123,3 +123,30 @@ test("stories entram no marcador", () => {
   assert.match(readFileSync(create[create.indexOf("--body-file") + 1], "utf8"), /stories=12,13/);
   assert.ok(existsSync(join(dir, path)));
 });
+
+test("revisão: o gate não leva para o commit o que já estava no stage", () => {
+  const { dir } = productRepo({ remote: false });
+  writeFileSync(join(dir, "segredo.txt"), "x");
+  sh(dir, "add", "segredo.txt");
+  const path = writeArtifact(dir);
+  const r = openGate({ cwd: dir, stage: "discovery", branch: "docs/discovery", title: "t", paths: path });
+  assert.equal(r.committed, true);
+  const files = sh(dir, "show", "--name-only", "--format=", "HEAD").split("\n");
+  assert.deepEqual(files, ["docs/product/discovery.md"]);
+});
+
+test("revisão: revisar um gate aberto a partir da main reaproveita o branch", () => {
+  const { dir } = productRepo({ remote: false });
+  const path = writeArtifact(dir);
+  openGate({ cwd: dir, stage: "discovery", branch: "docs/discovery", title: "v1", paths: path });
+  sh(dir, "switch", "-q", "main");
+  mkdirSync(join(dir, "docs/product"), { recursive: true });
+  writeFileSync(join(dir, path), "# Discovery v2\n");
+  const r = openGate({ cwd: dir, stage: "discovery", branch: "docs/discovery", title: "v2", paths: path });
+  assert.equal(r.ok, true, r.error);
+  assert.equal(r.committed, true);
+  assert.equal(sh(dir, "branch", "--show-current"), "docs/discovery");
+  assert.equal(readFileSync(join(dir, path), "utf8"), "# Discovery v2\n");
+  assert.equal(sh(dir, "log", "-1", "--format=%s"), "v2");
+  assert.equal(sh(dir, "stash", "list"), "");
+});

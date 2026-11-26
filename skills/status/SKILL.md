@@ -19,7 +19,8 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs $ARGUMENTS .
 
 (se `$ARGUMENTS` vier vazio, o `.` final aponta para o diretório atual). A saída é JSON com:
 
-- `artifacts.{discovery,prd,backlog,designSystem}` — `merged` (está no branch padrão; para o backlog, `docs/specs/`) e `pendingPr` (PR de gate aberto para a etapa)
+- `defaultBranch` / `comparedTo` — o branch padrão e a ref usada como "aprovado" (com remoto, `origin/<padrão>` depois de um `git fetch`)
+- `artifacts.{discovery,prd,backlog,designSystem}` — `merged` (está no branch padrão; para o backlog, `docs/specs/`), `pendingPr` (PR de gate aberto) e `pendingBranch` (gate só local, sem GitHub)
 - `github` — `"ok"` ou o motivo de não conseguir ler issues/PRs
 - `summary` — contagem de épicos e stories por estágio
 - `stories[]` — `number`, `title`, `stage` (`backlog` → `design-approved` → `ready-for-dev` → `in-review` → `done`), `pr`
@@ -36,7 +37,7 @@ Responda em PT-BR, curto, neste formato:
 
 | Etapa | Estado |
 |---|---|
-| Discovery | ✅ mergeado / 🔶 PR #n aguardando merge / ⬜ pendente |
+| Discovery | ✅ mergeado / 🔶 PR #n (ou branch) aguardando merge / ⬜ pendente |
 | PRD | … |
 | Backlog | <n> épicos, <n> stories + estado das specs (✅ / 🔶 PR #n / ⬜) |
 | Design System | … |
@@ -45,7 +46,7 @@ Responda em PT-BR, curto, neste formato:
 **Próximo passo:** `<next.command>` — <next.reason>
 ```
 
-- `action: "merge"` → o próximo passo é **seu merge** no PR indicado (é o gate humano); mostre o link e diga que, depois do merge, o comando seguinte destrava.
+- `action: "merge"` → o próximo passo é **seu merge** (é o gate humano): no PR indicado (mostre o link) ou, sem GitHub, do `next.branch` no branch padrão. Depois do merge, o comando seguinte destrava.
 - `action: "setup"` → explique o que configurar (`gh auth login`, criar o repo no GitHub e o remoto) antes de seguir.
 - Se houver stories, liste até 5 abaixo da tabela com `#número título — estágio`, priorizando as que estão em review e prontas para dev.
 

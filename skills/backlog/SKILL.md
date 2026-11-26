@@ -2,7 +2,7 @@
 name: backlog
 description: Terceira etapa da esteira. A partir do PRD aprovado, quebra cada capacidade (CAP-n) em um épico com stories priorizadas e critérios de aceite em Gherkin PT-BR com IDs AC-<issue>.<n>, publica tudo como issues no GitHub (labels type:epic/type:story), gera docs/specs/<issue>-<slug>.md e abre o PR de gate. Use quando a pessoa disser "/esteira:backlog", "quebrar o PRD em stories", "montar o backlog", ou quando o /esteira:status indicar esta etapa.
 argument-hint: "[--project <número do GitHub Project> --owner <login>]"
-allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/backlog.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/backlog.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Read Write Edit Glob Grep AskUserQuestion
+allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/backlog.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/backlog.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Read Write Edit Glob Grep AskUserQuestion
 ---
 
 # /esteira:backlog
@@ -13,15 +13,20 @@ Argumentos: `$ARGUMENTS`
 
 ## 0. Pré-checagem
 
-Rode com a ferramenta **Bash**:
+Rode com a ferramenta **Bash**, nesta ordem:
 
 ```
+node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs .
 node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs .
 ```
 
+O `sync` volta para o branch padrão e traz o que foi mergeado no GitHub (só se não houver mudanças não commitadas). Se ele responder `blocking: true`, mostre o `reason` e pergunte antes de seguir. Com `synced: false` e `blocking: false` (ex.: não é repo git), siga normalmente.
+
+Se a etapa anterior tiver `pendingBranch` (gate só local, sem GitHub), o próximo passo é a pessoa mergear esse branch no padrão: mostre o `next` e pare.
+
 - `artifacts.prd.merged` é `false` → o backlog depende do PRD aprovado. Mostre o `next` e **pare**.
 - `artifacts.backlog.merged` é `true` → o backlog já está aprovado. Mostre o `next` e pare. Stories novas entram em episódios de feature, não aqui.
-- `artifacts.backlog.pendingPr` existe → pergunte se é para revisar o plano existente (`.esteira/backlog.plan.json`) ou parar.
+- `artifacts.backlog.pendingPr` existe → pergunte se é para revisar o plano existente (`.esteira/backlog.plan.json`) ou parar. Para revisar: rode `node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs . --to docs/backlog`, ajuste o plano e rode os passos 4 e 5 de novo. As issues são reaproveitadas pelo título e o PR é atualizado.
 - `github` diferente de `"ok"` → avise que vai rodar em **modo simulado** (`--dry-run`): gera as specs com números provisórios, sem issues. O backlog real exige o repo no GitHub com `gh` logado.
 
 Leia `docs/product/discovery.md` e `docs/product/prd.md` inteiros, com a ferramenta **Read**.
@@ -93,6 +98,10 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/backlog.mjs --plan .esteira/backlog.plan.json
 - `warnings` → mostre no final (ex.: falta do escopo `project`: `gh auth refresh -s project`).
 
 ## 5. Abrir o gate
+
+**Em `--dry-run` não há gate:** os números são simulados e a prévia ficou em `.esteira/specs-preview/`. Pule este passo e diga que o backlog real (issues, `docs/specs/` e PR) precisa do repo no GitHub com `gh` logado.
+
+Fora do dry-run:
 
 ```
 node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs --stage backlog --branch docs/backlog --title "docs(backlog): épicos e stories do MVP" --paths docs/specs --summary "<resumo sem aspas duplas, crases nem $: quantos épicos, stories e ACs, e qual a primeira story>"

@@ -70,6 +70,23 @@ Formato de cada entrada:
 - Os issues do backlog são criados **antes** do merge do PR, porque os números das issues entram nos IDs dos ACs. O gate aprova o conteúdo das specs. Se o PR for fechado sem merge, as issues ficam órfãs; tratar isso na F6.
 - O `gh` atual não tem o escopo `project`. O GitHub Project fica opcional (`gh auth refresh -s project`).
 
+**Revisão independente do PR #1** (um subagente sem contexto da escrita) achou 8 bugs que os 32 testes não pegavam:
+
+| # | Gravidade | Bug | Correção |
+|---|---|---|---|
+| 1 | Alta | O status comparava com a `main` local, que não muda depois do merge no GitHub. Resultado: mandava refazer o discovery já aprovado | `git fetch` + comparar com `origin/<padrão>`; branch de gate só local vira "mergeie o branch"; `sync.mjs` volta para o padrão atualizado no início de cada etapa |
+| 2 | Alta | `outOfScope` em texto passava na validação e quebrava **depois** de criar as issues | Validação de tipos em todos os níveis e try/catch que sempre devolve JSON |
+| 3 | Alta | A busca por título reaproveitava qualquer issue (até um bug antigo) e sobrescrevia o corpo dela | Só reaproveita issues com a label `type:epic` ou `type:story`; falha na listagem vira erro |
+| 4 | Média | Títulos de story duplicados passavam | São rejeitados |
+| 5 | Média | Revisar um gate a partir da `main` falhava no `git switch` | O gate guarda o conteúdo, faz stash, troca de branch e reaplica; `sync --to <branch>` |
+| 6 | Média | O gate commitava tudo o que estava no stage (um `segredo.txt` entrou no commit) | `git commit -- <paths>` |
+| 7 | Média | O dry-run escrevia specs com números falsos em `docs/specs` | A prévia vai para `.esteira/specs-preview/`, sem gate; specs antigas do mesmo slug são substituídas |
+| 8 | Baixa | `Dada`, `Dados` e `Dadas` eram rejeitados | Aceitos |
+
+Agora são 46 testes, com um teste de regressão por achado.
+
+**Lição para o vídeo:** os testes que eu mesmo escrevi confirmavam o que eu tinha pensado, não o que podia dar errado. A revisão sem contexto achou o bug mais grave (o #1) só lendo o código.
+
 **Decisão:**
 - A IA planeja e o script publica: o plano em JSON é o contrato entre as duas partes.
 - A prioridade é a ordem das issues (a primeira story é a próxima a andar). Não criei campo de prioridade.

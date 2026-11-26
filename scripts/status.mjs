@@ -12,10 +12,10 @@ import { pathToFileURL } from "node:url";
 
 // path: o que precisa existir no branch padrão; prPrefix: arquivos que um PR de gate dessa etapa toca.
 const ARTIFACTS = {
-  discovery: { path: "docs/product/discovery.md", prPrefix: "docs/product/discovery.md" },
-  prd: { path: "docs/product/prd.md", prPrefix: "docs/product/prd.md" },
-  backlog: { path: "docs/specs", prPrefix: "docs/specs/" },
-  designSystem: { path: "docs/design/README.md", prPrefix: "docs/design/" },
+  discovery: { path: "docs/product/discovery.md", prPrefix: "docs/product/discovery.md", gateBranch: "docs/discovery" },
+  prd: { path: "docs/product/prd.md", prPrefix: "docs/product/prd.md", gateBranch: "docs/prd" },
+  backlog: { path: "docs/specs", prPrefix: "docs/specs/", gateBranch: "docs/backlog" },
+  designSystem: { path: "docs/design/README.md", prPrefix: "docs/design/", gateBranch: null },
 };
 
 function run(cmd, args, cwd) {
@@ -26,21 +26,35 @@ function run(cmd, args, cwd) {
   }
 }
 
-function defaultBranch(cwd) {
-  const ref = run("git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], cwd);
-  if (ref) return ref; // ex.: origin/main
-  for (const b of ["main", "master"]) {
-    if (run("git", ["rev-parse", "--verify", "--quiet", b], cwd)) return b;
+// Branch padrão e a ref que representa o "aprovado".
+// Com remoto: busca (git fetch) e compara com origin/<padrão>, porque o merge do gate acontece no GitHub
+// e a main local costuma estar desatualizada. Sem remoto: a main local (o merge local é o gate).
+export function resolveDefault(cwd) {
+  if (run("git", ["rev-parse", "--is-inside-work-tree"], cwd) === null) return { name: null, ref: null, fetched: false };
+  const hasOrigin = run("git", ["remote", "get-url", "origin"], cwd) !== null;
+  const fetched = hasOrigin && !process.env.ESTEIRA_NO_FETCH && run("git", ["fetch", "--quiet", "origin"], cwd) !== null;
+  let name = run("git", ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], cwd)?.replace(/^origin\//, "") ?? null;
+  if (!name && hasOrigin) {
+    const sym = run("git", ["ls-remote", "--symref", "origin", "HEAD"], cwd);
+    name = /ref: refs\/heads\/(\S+)\s+HEAD/.exec(sym ?? "")?.[1] ?? null;
   }
-  return null;
+  if (!name) name = ["main", "master"].find((b) => run("git", ["rev-parse", "--verify", "--quiet", b], cwd) !== null) ?? null;
+  if (!name) return { name: null, ref: null, fetched };
+  const remoteRef = `refs/remotes/origin/${name}`;
+  const ref = hasOrigin && run("git", ["rev-parse", "--verify", "--quiet", remoteRef], cwd) !== null ? `origin/${name}` : name;
+  return { name, ref, fetched };
 }
 
-// Um artefato só conta quando está no branch padrão (entrou por PR mergeado).
-function artifactState(cwd, branch, path) {
-  if (branch) {
-    return run("git", ["cat-file", "-e", `${branch}:${path}`], cwd) !== null;
-  }
+// Um artefato só conta quando está no branch padrão (entrou por PR mergeado). Sem git, vale o disco.
+function artifactState(cwd, ref, path) {
+  if (ref) return run("git", ["cat-file", "-e", `${ref}:${path}`], cwd) !== null;
   return existsSync(join(cwd, path));
+}
+
+// Branch de gate só local (sem PR): o artefato está nele mas ainda não no padrão.
+function pendingLocalBranch(cwd, ref, gateBranch, path) {
+  if (!ref || !gateBranch) return null;
+  return run("git", ["cat-file", "-e", `refs/heads/${gateBranch}:${path}`], cwd) !== null ? gateBranch : null;
 }
 
 function loadGh(cwd) {
@@ -85,15 +99,16 @@ function pendingStagePr(prs, path) {
 }
 
 export function collect(cwd) {
-  const branch = defaultBranch(cwd);
+  const def = resolveDefault(cwd);
   const gh = loadGh(cwd);
   const prs = gh.available ? gh.prs : [];
 
   const artifacts = {};
-  for (const [key, { path, prPrefix }] of Object.entries(ARTIFACTS)) {
-    const merged = artifactState(cwd, branch, path);
+  for (const [key, { path, prPrefix, gateBranch }] of Object.entries(ARTIFACTS)) {
+    const merged = artifactState(cwd, def.ref, path);
     const pr = merged ? null : pendingStagePr(prs, prPrefix);
-    artifacts[key] = { path, merged, pendingPr: pr ? { number: pr.number, url: pr.url } : null };
+    const localBranch = merged || pr ? null : pendingLocalBranch(cwd, def.ref, gateBranch, path);
+    artifacts[key] = { path, merged, pendingPr: pr ? { number: pr.number, url: pr.url } : null, pendingBranch: localBranch };
   }
 
   const prsByIssue = new Map();
@@ -117,14 +132,21 @@ export function collect(cwd) {
     done: count("done"),
   };
 
-  return { cwd, defaultBranch: branch, github: gh.available ? "ok" : gh.reason, artifacts, summary, stories, next: nextStep(artifacts, stories, gh.available) };
+  return {
+    cwd, defaultBranch: def.name, comparedTo: def.ref, fetched: def.fetched,
+    github: gh.available ? "ok" : gh.reason, artifacts, summary, stories,
+    next: nextStep(artifacts, stories, gh.available, def.name),
+  };
 }
 
-export function nextStep(artifacts, stories, ghAvailable) {
+export function nextStep(artifacts, stories, ghAvailable, defaultName = "main") {
   const waiting = (key, cmd) => {
     const a = artifacts[key];
     if (a.merged) return null;
     if (a.pendingPr) return { action: "merge", command: cmd, reason: `Revisar e mergear o PR #${a.pendingPr.number} (${a.path})`, pr: a.pendingPr };
+    if (a.pendingBranch) {
+      return { action: "merge", command: cmd, branch: a.pendingBranch, reason: `Revisar e mergear o branch ${a.pendingBranch} em ${defaultName}: sem PR no GitHub, o merge local é o gate` };
+    }
     return { action: "run", command: cmd, reason: `${a.path} ainda não existe no branch padrão` };
   };
 

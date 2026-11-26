@@ -2,7 +2,7 @@
 name: prd
 description: Segunda etapa da esteira. A partir do discovery aprovado, escreve docs/product/prd.md (visão, objetivos e métricas, capacidades do MVP com IDs CAP-n, fora de escopo, requisitos não funcionais) e abre o PR de gate. Use quando a pessoa disser "/esteira:prd", "vamos escrever o PRD", "definir o escopo do MVP", ou quando o /esteira:status indicar esta etapa.
 argument-hint: "[orientação extra de escopo, opcional]"
-allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Read Write Edit Glob Grep AskUserQuestion
+allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Read Write Edit Glob Grep AskUserQuestion
 ---
 
 # /esteira:prd
@@ -13,15 +13,20 @@ Orientação extra: `$ARGUMENTS`
 
 ## 0. Pré-checagem
 
-Rode com a ferramenta **Bash**:
+Rode com a ferramenta **Bash**, nesta ordem:
 
 ```
+node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs .
 node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs .
 ```
 
+O `sync` volta para o branch padrão e traz o que foi mergeado no GitHub (só se não houver mudanças não commitadas). Se ele responder `blocking: true`, mostre o `reason` e pergunte antes de seguir. Com `synced: false` e `blocking: false` (ex.: não é repo git), siga normalmente.
+
+Se a etapa anterior tiver `pendingBranch` (gate só local, sem GitHub), o próximo passo é a pessoa mergear esse branch no padrão: mostre o `next` e pare.
+
 - `artifacts.discovery.merged` é `false` → o PRD depende do discovery aprovado. Mostre o `next` (rodar `/esteira:discovery` ou mergear o PR dele) e **pare**.
 - `artifacts.prd.merged` é `true` → o PRD já está aprovado. Mostre o `next` e pare.
-- `artifacts.prd.pendingPr` existe → pergunte se a pessoa quer revisar o arquivo existente (edite e rode o passo 4 de novo, que atualiza o mesmo PR) ou parar.
+- `artifacts.prd.pendingPr` existe → pergunte se a pessoa quer revisar o arquivo existente ou parar. Para revisar: rode `node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs . --to docs/prd` para voltar ao branch do PR, edite e rode o passo 4 de novo, que atualiza o mesmo PR.
 
 Leia `docs/product/discovery.md` inteiro.
 
