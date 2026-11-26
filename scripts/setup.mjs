@@ -10,7 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs, print } from "./lib.mjs";
 
@@ -49,6 +49,12 @@ export function patchEslintConfig(src) {
   throw new Error("Não reconheci o formato do eslint.config.mjs para registrar a regra do DS.");
 }
 
+/** Nome de pacote npm válido a partir do nome da pasta do repo. */
+export function packageName(dir) {
+  const n = String(dir).toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[._-]+|[._-]+$/g, "");
+  return n || "app";
+}
+
 export function addScripts(pkg) {
   // next typegen gera os tipos de rota (LayoutProps, PageProps) que o tsc precisa antes do primeiro build.
   pkg.scripts = { ...pkg.scripts, typecheck: pkg.scripts?.typecheck ?? "next typegen && tsc --noEmit" };
@@ -82,7 +88,7 @@ function writeIfMissing(cwd, rel, content) {
 // Tudo o que o setup cria ou altera no repo: é o que vai para o commit do gate (filtrado pelo que existe).
 export const SETUP_PATHS = [
   ".github/workflows/ci.yml", ".github/workflows/esteira-gates.yml", ".gitignore", "AGENTS.md", "CLAUDE.md",
-  "components.json", "eslint-rules", "eslint.config.mjs", "next-env.d.ts", "next.config.ts", "package.json",
+  "components.json", "eslint-rules", "eslint.config.mjs", "next.config.ts", "package.json",
   "package-lock.json", "postcss.config.mjs", "public", "src", "tsconfig.json",
 ];
 
@@ -144,7 +150,10 @@ export function setup(opts = {}) {
   }
 
   // 3. Script de typecheck (idempotente).
-  writeFileSync(pkgPath, JSON.stringify(addScripts(JSON.parse(readFileSync(pkgPath, "utf8"))), null, 2) + "\n");
+  const pkgJson = addScripts(JSON.parse(readFileSync(pkgPath, "utf8")));
+  // O create-next-app gerou numa pasta temporária "app": o pacote leva o nome do repo (vai para a release).
+  if (!existing && pkgJson.name === "app") pkgJson.name = packageName(basename(cwd));
+  writeFileSync(pkgPath, JSON.stringify(pkgJson, null, 2) + "\n");
 
   // 4. Regra de lint do Design System (idempotente).
   writeIfMissing(cwd, "eslint-rules/esteira-ds.mjs", readFileSync(join(TEMPLATES, "eslint-rules/esteira-ds.mjs"), "utf8"));

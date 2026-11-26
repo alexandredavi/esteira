@@ -13,6 +13,8 @@ Story pedida: `$ARGUMENTS`
 
 > **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir`. Comandos compostos pedem aprovação e travam a etapa. Para mudar arquivo, use a ferramenta Edit ou Write, nunca `sed`, `awk` ou redirecionamento.
 
+> **Nunca edite os arquivos do plugin** (tudo em `${CLAUDE_PLUGIN_ROOT}`: scripts, templates e skills). Se um script da esteira falhar, mostre o erro e pare: quem corrige o plugin é quem o mantém, não a etapa.
+
 ## 0. Pré-checagem
 
 Rode com a ferramenta **Bash**, nesta ordem:
@@ -84,7 +86,7 @@ Troque o conteúdo de `## Técnica` (o comentário e o `_Pendente._`) por:
 ### Plano de testes
 | AC | Teste de aceite (`e2e/<n>-<slug>.spec.ts`) | Como preparar o "Dado" | Unidade (Vitest) |
 |---|---|---|---|
-<todo AC tem uma linha. Preparação: pela própria UI (ex.: cadastrar o projeto antes) ou com o relógio do Playwright (page.clock) para tempo. O banco é zerado antes de cada teste. Nada de acesso direto ao banco nos testes de aceite.>
+<todo AC tem uma linha. Preparação: pela própria UI (ex.: cadastrar o projeto antes) ou com o relógio do Playwright (page.clock) para tempo **do navegador**. O page.clock NÃO alcança o servidor: regra de tempo calculada no servidor (virada do dia, prazos) é verificada em teste de unidade com horário fixo, e o teste de aceite usa a hora real. O banco é zerado antes de cada teste. Nada de acesso direto ao banco nos testes de aceite.>
 
 ### Decisões e riscos
 - <decisão> — <motivo>

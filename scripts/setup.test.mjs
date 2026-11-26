@@ -82,3 +82,10 @@ test("revisão F2: app completo é already, com os paths", () => {
   assert.equal(r.already, true);
   assert.ok(r.paths.includes("components.json"));
 });
+
+test("dry-run F6: nome do pacote vem da pasta do repo (não 'app' do diretório temporário)", async () => {
+  const { packageName } = await import("./setup.mjs");
+  assert.equal(packageName("esteira-dryrun"), "esteira-dryrun");
+  assert.equal(packageName("Meu Produto!"), "meu-produto");
+  assert.equal(packageName("___"), "app");
+});

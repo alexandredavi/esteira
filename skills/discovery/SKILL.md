@@ -2,7 +2,7 @@
 name: discovery
 description: Primeira etapa da esteira. Transforma uma ideia bruta de produto em docs/product/discovery.md (problema, personas, jobs to be done, concorrentes com fonte, proposta de valor, nome, premissas) e abre o PR de gate. Use quando a pessoa disser "/esteira:discovery", "tenho uma ideia de produto", "vamos fazer o discovery", ou quando o /esteira:status indicar esta etapa.
 argument-hint: "<ideia do produto em uma ou duas frases>"
-allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Read Write Edit Glob Grep WebSearch WebFetch AskUserQuestion Agent
+allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/status.mjs *) PowerShell(node ${CLAUDE_PLUGIN_ROOT}/scripts/gate.mjs *) Read Write Edit Glob Grep WebSearch WebFetch AskUserQuestion
 ---
 
 # /esteira:discovery
@@ -12,6 +12,8 @@ Você conduz o discovery de um produto novo. O resultado é **um arquivo** (`doc
 Ideia recebida: `$ARGUMENTS`
 
 > **Execução:** rode cada comando sozinho, a partir do diretório atual do repo: sem `cd`, `&&`, `;` ou `mkdir` (a ferramenta Write já cria as pastas). Comandos compostos pedem aprovação e travam a etapa. Para mudar arquivo, use a ferramenta Edit ou Write, nunca `sed`, `awk` ou redirecionamento.
+
+> **Nunca edite os arquivos do plugin** (tudo em `${CLAUDE_PLUGIN_ROOT}`: scripts, templates e skills). Se um script da esteira falhar, mostre o erro e pare: quem corrige o plugin é quem o mantém, não a etapa.
 
 ## 0. Pré-checagem
 
@@ -44,9 +46,7 @@ Faça **uma única rodada** de até 5 perguntas, cada uma com a sua recomendaç�
 
 ## 2. Concorrentes e alternativas
 
-Delegue ao subagente **`esteira:pm`** (ferramenta Agent), passando a ideia, a persona principal e o problema em uma frase. Ele devolve a tabela com fontes.
-
-Se o subagente não estiver disponível, faça você mesmo, seguindo as mesmas regras: inclua uma alternativa não-software, nunca invente URL e marque com `conhecimento do modelo — validar` o que não confirmou.
+Faça a pesquisa **você mesmo, neste turno**, seguindo as regras do PM da esteira em `${CLAUDE_PLUGIN_ROOT}/agents/pm.md` (leia com a ferramenta Read): de 4 a 7 alternativas, pelo menos uma não-software, confirmadas com WebSearch/WebFetch, nunca invente URL e marque com `conhecimento do modelo — validar` o que não confirmou. Não delegue a um subagente: o resultado dele chegaria num turno seguinte, sem as permissões desta skill.
 
 ## 3. Nome
 

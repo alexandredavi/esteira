@@ -1,9 +1,14 @@
 #!/usr/bin/env node
-// Estado dos deploys do produto, lido da API de deployments do GitHub (onde a Vercel publica).
+// Estado dos deploys do produto, lido do GitHub (onde a integração da Vercel reporta).
 //
 // node deploy-status.mjs [--cwd repo]
 // → JSON { ok, vercel, production, previews[], buildMigrates, notes[] }
-// production = o ÚLTIMO deploy de produção (depois de um Instant Rollback, pode não ser o que está no ar).
+//
+// Fontes (validadas no dry-run da F6 — a integração atual da Vercel NÃO usa a API de Deployments):
+// - estado: o commit status com contexto "Vercel" do commit (main para produção, head do PR para preview);
+//   target_url = página do deploy no painel da Vercel.
+// - URL do preview: o comentário do vercel[bot] no PR.
+// production = o deploy do ÚLTIMO commit da main (depois de um Instant Rollback, pode não ser o que está no ar).
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -15,10 +20,22 @@ const api = (cwd, path) => {
   return r.ok ? JSON.parse(r.out || "null") : null;
 };
 
-function latestStatus(cwd, id) {
-  const st = api(cwd, `repos/{owner}/{repo}/deployments/${id}/statuses?per_page=1`);
-  const s = Array.isArray(st) ? st[0] : null;
-  return s ? { state: s.state, url: s.environment_url || s.target_url || null } : { state: "unknown", url: null };
+/** Status "Vercel" de um commit (ref = branch ou sha). null = sem deploy da Vercel. */
+export function vercelStatus(cwd, ref) {
+  const combined = api(cwd, `repos/{owner}/{repo}/commits/${ref}/status`);
+  const s = (combined?.statuses ?? []).find((x) => /^vercel/i.test(x.context ?? ""));
+  return s ? { state: s.state, inspect: s.target_url ?? null, description: s.description ?? null } : null;
+}
+
+/** URL do preview no comentário do vercel[bot] no PR. */
+export function previewUrl(cwd, pr) {
+  const comments = api(cwd, `repos/{owner}/{repo}/issues/${pr}/comments?per_page=50`);
+  for (const c of Array.isArray(comments) ? comments : []) {
+    if (!/vercel/i.test(c.user?.login ?? "")) continue;
+    const m = /https:\/\/[a-z0-9.-]+\.vercel\.app/i.exec(c.body ?? "");
+    if (m) return m[0];
+  }
+  return null;
 }
 
 export function deployStatus(opts = {}) {
@@ -29,33 +46,25 @@ export function deployStatus(opts = {}) {
   const buildMigrates = build.includes("scripts/esteira/migrate.mjs");
   if (!buildMigrates) notes.push("O build ainda não migra o banco: rode /esteira:deploy para instalar a migração no build.");
 
-  if (!gh(cwd, "repo", "view", "--json", "nameWithOwner").ok) {
+  const repo = gh(cwd, "repo", "view", "--json", "defaultBranchRef");
+  if (!repo.ok) {
     return { ok: true, github: "indisponível (sem remoto ou gh sem login)", vercel: "desconhecido", production: null, previews: [], buildMigrates, notes };
   }
-  // Consultas filtradas (por ambiente e por branch), em vez de "os N mais recentes": num repo ativo,
-  // o deploy de produção ou o preview de um PR antigo podem estar além da primeira página.
-  const recent = api(cwd, "repos/{owner}/{repo}/deployments?per_page=10");
-  if (!Array.isArray(recent)) return { ok: false, error: "Não consegui ler os deployments do repo (gh api)." };
-  const byVercel = (list) => (Array.isArray(list) ? list : []).filter((d) => /vercel/i.test(d.creator?.login ?? ""));
+  const main = JSON.parse(repo.out || "{}").defaultBranchRef?.name ?? "main";
 
-  // A API devolve do mais novo para o mais antigo.
-  const prod = byVercel(api(cwd, "repos/{owner}/{repo}/deployments?environment=Production&per_page=5"))[0] ?? null;
-  const production = prod ? { sha: prod.sha.slice(0, 7), ref: prod.ref, createdAt: prod.created_at, ...latestStatus(cwd, prod.id) } : null;
+  const prodStatus = vercelStatus(cwd, main);
+  const production = prodStatus ? { ref: main, ...prodStatus } : null;
 
   const prsOut = gh(cwd, "pr", "list", "--state", "open", "--json", "number,headRefName,title");
   const prs = prsOut.ok ? JSON.parse(prsOut.out || "[]") : [];
-  let anyVercel = byVercel(recent).length > 0 || Boolean(prod);
   const previews = prs.map((pr) => {
-    const list = byVercel(api(cwd, `repos/{owner}/{repo}/deployments?ref=${encodeURIComponent(pr.headRefName)}&per_page=5`));
-    const d = list.find((x) => /preview/i.test(x.environment ?? ""));
-    if (d) anyVercel = true;
-    return { pr: pr.number, title: pr.title, ref: pr.headRefName, ...(d ? latestStatus(cwd, d.id) : { state: "sem deploy", url: null }) };
+    const st = vercelStatus(cwd, pr.headRefName);
+    return { pr: pr.number, title: pr.title, ref: pr.headRefName, state: st?.state ?? "sem deploy", url: st ? previewUrl(cwd, pr.number) : null, inspect: st?.inspect ?? null };
   });
 
-  const vercel = anyVercel ? "conectada" : "não conectada";
-  if (!anyVercel) notes.push("Nenhum deploy da Vercel neste repo: importe o repo em vercel.com/new (veja docs/deploy.md).");
-
-  return { ok: true, github: "ok", vercel, production, previews, buildMigrates, notes };
+  const connected = Boolean(prodStatus) || previews.some((p) => p.state !== "sem deploy");
+  if (!connected) notes.push("Nenhum deploy da Vercel reportado no GitHub: importe o repo em vercel.com/new (veja docs/deploy.md). Commits anteriores à conexão não têm deploy.");
+  return { ok: true, github: "ok", vercel: connected ? "conectada" : "não conectada", production, previews, buildMigrates, notes };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

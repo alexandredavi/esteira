@@ -172,3 +172,13 @@ test("revisão F3: --closes e --stories só aceitam números", () => {
   assert.match(openGate({ cwd: dir, stage: "dev", branch: "feat/1-x", title: "t", paths: path, closes: "abc" }).error, /só números/);
   assert.match(openGate({ cwd: dir, stage: "spec", branch: "docs/x", title: "t", paths: path, stories: "12,x" }).error, /só números/);
 });
+
+test("dry-run F6: caminho ignorado pelo .gitignore fica de fora em vez de quebrar o git add", () => {
+  const { dir } = productRepo({ remote: false });
+  writeFileSync(join(dir, ".gitignore"), "next-env.d.ts\n");
+  writeFileSync(join(dir, "next-env.d.ts"), "// gerado\n");
+  const path = writeArtifact(dir);
+  const r = openGate({ cwd: dir, stage: "setup", branch: "chore/setup", title: "t", paths: `${path},next-env.d.ts` });
+  assert.equal(r.ok, true, r.error);
+  assert.deepEqual(r.paths, [path]);
+});

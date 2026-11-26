@@ -99,6 +99,10 @@ export function openGate(opts) {
     }
   }
 
+  // Caminhos ignorados pelo .gitignore (ex.: next-env.d.ts) fazem o git add falhar: ficam de fora.
+  const ignored = new Set(git(cwd, "check-ignore", "--", ...paths).out.split("\n").filter(Boolean));
+  if (ignored.size) paths.splice(0, paths.length, ...paths.filter((p) => !ignored.has(p)));
+  if (paths.length === 0) return { ok: false, error: "Todos os caminhos estão no .gitignore: nada para commitar." };
   const add = git(cwd, "add", "--", ...paths);
   if (!add.ok) return { ok: false, error: `git add falhou: ${add.err}` };
   // Só os caminhos da etapa entram no commit, mesmo que haja outras coisas no stage.

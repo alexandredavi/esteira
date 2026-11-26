@@ -37,6 +37,10 @@ async function conectar(): Promise<Db> {
     const { drizzle } = await import("drizzle-orm/neon-http");
     return drizzle(neon(url), { schema }) as unknown as Db;
   }
+  // Na Vercel sem DATABASE_URL, um banco em memória perderia os dados em silêncio: falha com mensagem clara.
+  if (process.env.VERCEL_ENV && !e2e) {
+    throw new Error(`DATABASE_URL não está definido no ambiente ${process.env.VERCEL_ENV} da Vercel. Conecte o Neon (veja docs/deploy.md).`);
+  }
   const { criarDbLocal } = await import("./local");
   return criarDbLocal(e2e ? "memory://" : (process.env.PGLITE_DIR ?? "memory://"));
 }
